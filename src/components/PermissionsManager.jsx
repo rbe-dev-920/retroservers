@@ -30,6 +30,7 @@ import {
 import { getAllRoles } from '../lib/permissions';
 import PermissionEditor from './PermissionEditor';
 import PermissionStats from './PermissionStats';
+import MyRBEPermissionsManager from './MyRBEPermissionsManager';
 
 /**
  * PermissionsManager - Gestion des droits individuels
@@ -126,6 +127,7 @@ export default function PermissionsManager() {
       <Tabs colorScheme="blue" variant="enclosed">
         <TabList>
           <Tab>📊 Statistiques</Tab>
+          <Tab>🎯 Accès MyRBE</Tab>
           <Tab>👥 Gestion des utilisateurs</Tab>
         </TabList>
 
@@ -135,7 +137,12 @@ export default function PermissionsManager() {
             <PermissionStats />
           </TabPanel>
 
-          {/* Tab 2: Gestion des utilisateurs */}
+          {/* Tab 2: Accès MyRBE */}
+          <TabPanel>
+            <MyRBEPermissionsManager />
+          </TabPanel>
+
+          {/* Tab 3: Gestion des utilisateurs */}
           <TabPanel>
             <VStack spacing={6} align="stretch">
               {/* Info de débogage */}
