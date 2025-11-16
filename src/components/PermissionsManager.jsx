@@ -51,6 +51,7 @@ export default function PermissionsManager() {
   const { isOpen: isAddPermOpen, onOpen: onAddPermOpen, onClose: onAddPermClose } = useDisclosure();
 
   const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState(null);
   const [formRole, setFormRole] = useState('MEMBER');
   const rolesInfo = getAllRoles();
