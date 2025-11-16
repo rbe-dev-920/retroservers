@@ -38,11 +38,11 @@ export const getSiteConfigPath = () => 'api/site-config';
 export const getChangelogPath = () => 'api/changelog';
 export const getRetroNewsPath = () => 'api/retro-news';
 
-export const getUsersOrigin = () => process.env.VITE_API_URL || '';
-export const getMembersOrigin = () => process.env.VITE_API_URL || '';
-export const getSiteConfigOrigin = () => process.env.VITE_API_URL || '';
-export const getChangelogOrigin = () => process.env.VITE_API_URL || '';
-export const getGlobalOrigin = () => process.env.VITE_API_URL || '';
+export const getUsersOrigin = () => import.meta.env.VITE_API_URL || '';
+export const getMembersOrigin = () => import.meta.env.VITE_API_URL || '';
+export const getSiteConfigOrigin = () => import.meta.env.VITE_API_URL || '';
+export const getChangelogOrigin = () => import.meta.env.VITE_API_URL || '';
+export const getGlobalOrigin = () => import.meta.env.VITE_API_URL || '';
 
 /**
  * Utility functions
@@ -53,7 +53,7 @@ export const clean = (p) => String(p || '').trim().replace(/^\/+|\/+$/g, '');
 
 // Get API prefix from environment or default
 export const getApiPrefix = () => {
-  const prefix = process.env.VITE_API_PREFIX || '';
+  const prefix = import.meta.env.VITE_API_PREFIX || '';
   return clean(prefix);
 };
 
