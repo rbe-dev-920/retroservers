@@ -83,16 +83,16 @@ export function getFunctionDescription(functionId) {
 export function groupFunctionsByModule(userFunctions) {
   const grouped = {};
   
-  userFunctions.forEach(fid => {
+  // Itérer sur tous les IDs de fonctions (ou userFunctions si c'est un array)
+  const functionsToProcess = Array.isArray(userFunctions) ? userFunctions : Object.values(FUNCTIONS);
+  
+  functionsToProcess.forEach(fid => {
     const desc = FUNCTION_DESCRIPTIONS[fid];
     if (desc && desc.module) {
       if (!grouped[desc.module]) {
         grouped[desc.module] = [];
       }
-      grouped[desc.module].push({
-        id: fid,
-        ...desc
-      });
+      grouped[desc.module].push(fid);
     }
   });
   
