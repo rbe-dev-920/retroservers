@@ -111,7 +111,8 @@ const cards = [
     icon: FiCalendar,
     color: "orange",
     resource: "PLANNING",
-    cardAccess: true
+    cardAccess: true,
+    hidden: true // Temporairement masqué - en cours de correction de la modale
   },
   {
     title: "Gestion du Site",
@@ -139,7 +140,8 @@ const cards = [
     icon: FiInbox,
     color: "teal",
     resource: "RETROMAIL",
-    cardAccess: true
+    cardAccess: true,
+    hidden: true // Non utilisé sur MyRBE
   },
   {
     title: "RétroSupport",
@@ -155,7 +157,8 @@ const cards = [
     description: "Informations personnelles et permissions",
     to: "/dashboard/profile",
     icon: FiUsers,
-    color: "blue"
+    color: "blue",
+    hidden: true // Non utilisé sur MyRBE
   }
 ];
 
@@ -179,6 +182,11 @@ export default function MyRBE() {
    * Vérifier si une carte doit être affichée
    */
   const shouldShowCard = (card) => {
+    // Si la carte est masquée, ne pas l'afficher (sauf pour ADMIN)
+    if (card.hidden && userRole !== 'ADMIN') {
+      return false;
+    }
+
     // Les ADMIN voient TOUT
     if (userRole === 'ADMIN') {
       return true;
