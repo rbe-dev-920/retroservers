@@ -38,10 +38,15 @@ export function QuoteTemplatePreview({ template, data = {} }) {
 
     let html = template.htmlContent;
 
-    // Remplacer les variables {{VAR}} par les données
+    // Remplacer les variables {VAR} et {{VAR}} par les données
     Object.entries(data).forEach(([key, value]) => {
-      const placeholder = `{{${key}}}`;
-      html = html.replace(new RegExp(placeholder, 'g'), value || '');
+      // Tenter d'abord les doubles accolades {{}}
+      const placeholder1 = `{{${key}}}`;
+      html = html.replace(new RegExp(placeholder1, 'g'), value || '');
+      
+      // Puis les simples accolades {}
+      const placeholder2 = `{${key}}`;
+      html = html.replace(new RegExp(placeholder2, 'g'), value || '');
     });
 
     return html;
@@ -351,7 +356,7 @@ export default function QuoteTemplateManager() {
                   fontSize="sm"
                 />
                 <Text fontSize="xs" color="gray.500" mt={2}>
-                  Utilisez {{'{{'}}VARIABLE{{'}}'}} pour les placeholders
+                  Utilisez les placeholders: NUM_DEVIS, OBJET, MONTANT, DATE, DESTINATAIRE_NOM, DESTINATAIRE_ADRESSE
                 </Text>
               </Box>
 
