@@ -29,7 +29,7 @@ import { fetchJson } from '../apiClient';
  * TemplatePreview - Affiche l'aperçu live d'un template de devis
  * avec remplacage des variables
  */
-export default function QuoteTemplatePreview({ template, data = {} }) {
+export function QuoteTemplatePreview({ template, data = {} }) {
   const [previewHtml, setPreviewHtml] = useState('');
 
   // Remplacer les placeholders par les données
@@ -65,7 +65,7 @@ export default function QuoteTemplatePreview({ template, data = {} }) {
 /**
  * QuoteTemplateManager - Gestion des templates de devis
  */
-export function QuoteTemplateManager() {
+export default function QuoteTemplateManager() {
   const toast = useToast();
   const { isOpen, onOpen, onClose } = useDisclosure();
 
