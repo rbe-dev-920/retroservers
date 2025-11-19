@@ -13,8 +13,10 @@
   "dependencies": {
     "@chakra-ui/icons": "^2.2.4",
     "@chakra-ui/react": "2.10.9",
-    "@emotion/react": "11.14.0",
-    "@emotion/styled": "11.14.1",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/icons-material": "^7.3.5",
+    "@mui/material": "^7.3.5",
     "@tiptap/extension-color": "^3.10.1",
     "@tiptap/extension-highlight": "^3.10.1",
     "@tiptap/extension-image": "^3.10.1",

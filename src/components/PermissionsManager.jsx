@@ -1,64 +1,60 @@
 import React, { useState, useEffect } from 'react';
 import {
   Box,
+  Button,
   Card,
-  CardContent,
+  CardBody,
   CardHeader,
   Container,
   Grid,
+  GridItem,
   Tab,
-  Tabs,
+  TabList,
+  TabPanels,
+  TabPanel,
   TextField,
-  Button,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  FormControlLabel,
-  Checkbox,
+  Input,
   Select,
-  MenuItem,
+  Checkbox,
+  FormControl,
+  FormLabel,
   Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
-  Chip,
+  Thead,
+  Tbody,
+  Tr,
+  Th,
+  Td,
+  Badge,
   Alert,
+  AlertIcon,
   CircularProgress,
-  Typography,
-  Dialog as MuiDialog
-} from '@mui/material';
-import AddIcon from '@mui/icons-material/Add';
-import DeleteIcon from '@mui/icons-material/Delete';
-import RefreshIcon from '@mui/icons-material/Refresh';
+  Heading,
+  Text,
+  VStack,
+  HStack,
+  Divider,
+  useDisclosure,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalCloseButton,
+  ModalBody,
+  ModalFooter,
+  Stack,
+  useToast
+} from '@chakra-ui/react';
+import { AddIcon as ChakraAddIcon, DeleteIcon as ChakraDeleteIcon } from '@chakra-ui/icons';
 
-/**
- * Tab panel component
- */
-function TabPanel(props) {
-  const { children, value, index, ...other } = props;
-  return (
-    <div
-      role="tabpanel"
-      hidden={value !== index}
-      id={`tabpanel-${index}`}
-      aria-labelledby={`tab-${index}`}
-      {...other}
-    >
-      {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
-    </div>
-  );
-}
 
 /**
  * PermissionsManager - Gestionnaire complet des permissions
  * Remplace les onglets "Accès MyRBE" et "Gestion des utilisateurs"
  */
 export default function PermissionsManager() {
-  const [tabValue, setTabValue] = useState(0);
+  const toast = useToast();
+  const { isOpen, onOpen, onClose } = useDisclosure();
+  
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
@@ -80,7 +76,6 @@ export default function PermissionsManager() {
   const [roleFilter, setRoleFilter] = useState('');
 
   // Dialog pour accorder une permission
-  const [grantDialog, setGrantDialog] = useState(false);
   const [grantData, setGrantData] = useState({
     userId: '',
     functionId: '',
@@ -203,7 +198,7 @@ export default function PermissionsManager() {
       }
 
       setSuccess('Permission accordée avec succès');
-      setGrantDialog(false);
+      onClose();
       setGrantData({
         userId: '',
         functionId: '',
@@ -261,286 +256,295 @@ export default function PermissionsManager() {
 
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px' }}>
-        <CircularProgress />
+      <Box display="flex" justifyContent="center" alignItems="center" height="400px">
+        <VStack spacing={4}>
+          <CircularProgress isIndeterminate color="blue.300" />
+          <Text>Chargement des permissions...</Text>
+        </VStack>
       </Box>
     );
   }
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
+    <Container maxW="container.lg" py={8}>
       {/* Titre */}
-      <Typography variant="h4" gutterBottom sx={{ mb: 3, fontWeight: 'bold' }}>
+      <Heading size="2xl" mb={6}>
         🔐 Gestionnaire des Permissions du Site
-      </Typography>
+      </Heading>
 
       {/* Messages */}
       {error && (
-        <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 2 }}>
-          {error}
+        <Alert status="error" mb={4} borderRadius="md">
+          <AlertIcon />
+          <Box>
+            <Text fontWeight="bold">Erreur</Text>
+            <Text fontSize="sm">{error}</Text>
+          </Box>
         </Alert>
       )}
       {success && (
-        <Alert severity="success" onClose={() => setSuccess(null)} sx={{ mb: 2 }}>
-          {success}
+        <Alert status="success" mb={4} borderRadius="md">
+          <AlertIcon />
+          <Text>{success}</Text>
         </Alert>
       )}
 
       {/* Tabs */}
-      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
-        <Tabs
-          value={tabValue}
-          onChange={(e, newValue) => setTabValue(newValue)}
-          aria-label="permission management tabs"
-        >
-          <Tab label="Vue d'ensemble des permissions" id="tab-0" aria-controls="tabpanel-0" />
-          <Tab label="Gestion des utilisateurs" id="tab-1" aria-controls="tabpanel-1" />
-          <Tab label="Audit et logs" id="tab-2" aria-controls="tabpanel-2" />
-        </Tabs>
-      </Box>
+      <Tabs colorScheme="blue" variant="enclosed">
+        <TabList mb={4}>
+          <Tab>Vue d'ensemble des permissions</Tab>
+          <Tab>Gestion des utilisateurs</Tab>
+          <Tab>Audit et logs</Tab>
+        </TabList>
 
-      {/* TAB 1: Vue d'ensemble des permissions */}
-      <TabPanel value={tabValue} index={0}>
-        <Grid container spacing={2} sx={{ mb: 3 }}>
-          <Grid item xs={12} sm={6}>
-            <TextField
-              fullWidth
-              placeholder="Rechercher une fonction..."
-              value={searchFilter}
-              onChange={(e) => setSearchFilter(e.target.value)}
-              variant="outlined"
-              size="small"
-            />
-          </Grid>
-          <Grid item xs={12} sm={6}>
-            <Select
-              fullWidth
-              value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value)}
-              displayEmpty
-              size="small"
-            >
-              <MenuItem value="">Tous les groupes</MenuItem>
-              {[...new Set(permissions.functions.map(f => f.group))].map(group => (
-                <MenuItem key={group} value={group}>
-                  {group}
-                </MenuItem>
-              ))}
-            </Select>
-          </Grid>
-        </Grid>
+        <TabPanels>
+          {/* TAB 1: Vue d'ensemble des permissions */}
+          <TabPanel>
+            <VStack spacing={4} align="stretch">
+              <HStack spacing={2}>
+                <Input
+                  placeholder="Rechercher une fonction..."
+                  value={searchFilter}
+                  onChange={(e) => setSearchFilter(e.target.value)}
+                />
+                <Select
+                  value={roleFilter}
+                  onChange={(e) => setRoleFilter(e.target.value)}
+                  maxW="200px"
+                >
+                  <option value="">Tous les groupes</option>
+                  {[...new Set(permissions.functions.map(f => f.group))].map(group => (
+                    <option key={group} value={group}>
+                      {group}
+                    </option>
+                  ))}
+                </Select>
+              </HStack>
 
-        {/* Tableau des permissions */}
-        <TableContainer component={Paper}>
-          <Table>
-            <TableHead>
-              <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                <TableCell sx={{ fontWeight: 'bold' }}>Fonction</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Groupe</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Description</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Rôles par défaut</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {filteredFunctions.map((func) => (
-                <TableRow key={func.id}>
-                  <TableCell sx={{ fontWeight: '500' }}>{func.name}</TableCell>
-                  <TableCell>{func.group}</TableCell>
-                  <TableCell>{func.description}</TableCell>
-                  <TableCell>
-                    {permissions.roleFunctionDefaults[func.id]?.roles?.map(role => (
-                      <Chip key={role} label={role} size="small" sx={{ mr: 1 }} />
+              {/* Tableau des permissions */}
+              <Box overflowX="auto">
+                <Table size="sm" variant="striped">
+                  <Thead bg="gray.100">
+                    <Tr>
+                      <Th>Fonction</Th>
+                      <Th>Groupe</Th>
+                      <Th>Description</Th>
+                      <Th>Rôles par défaut</Th>
+                    </Tr>
+                  </Thead>
+                  <Tbody>
+                    {filteredFunctions.map((func) => (
+                      <Tr key={func.id}>
+                        <Td fontWeight="medium">{func.name}</Td>
+                        <Td>{func.group}</Td>
+                        <Td>{func.description}</Td>
+                        <Td>
+                          <HStack spacing={1}>
+                            {permissions.roleFunctionDefaults[func.id]?.roles?.map(role => (
+                              <Badge key={role} colorScheme="purple" size="sm">
+                                {role}
+                              </Badge>
+                            ))}
+                          </HStack>
+                        </Td>
+                      </Tr>
                     ))}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </TabPanel>
+                  </Tbody>
+                </Table>
+              </Box>
+            </VStack>
+          </TabPanel>
 
-      {/* TAB 2: Gestion des utilisateurs */}
-      <TabPanel value={tabValue} index={1}>
-        <Grid container spacing={2}>
-          <Grid item xs={12} md={4}>
+          {/* TAB 2: Gestion des utilisateurs */}
+          <TabPanel>
+            <Grid templateColumns={{ base: '1fr', md: '1fr 2fr' }} gap={4}>
+              <GridItem>
+                <Card>
+                  <CardHeader>
+                    <Heading size="md">Utilisateurs</Heading>
+                  </CardHeader>
+                  <CardBody>
+                    <VStack spacing={2} align="stretch">
+                      <Input
+                        placeholder="Rechercher un utilisateur..."
+                        size="sm"
+                      />
+                      <Text fontSize="sm" color="gray.600">
+                        Chargement des utilisateurs...
+                      </Text>
+                    </VStack>
+                  </CardBody>
+                </Card>
+              </GridItem>
+
+              <GridItem>
+                <Card>
+                  <CardHeader>
+                    <HStack justify="space-between">
+                      <Heading size="md">Permissions</Heading>
+                      <Button
+                        leftIcon={<ChakraAddIcon />}
+                        colorScheme="blue"
+                        size="sm"
+                        onClick={onOpen}
+                      >
+                        Ajouter une permission
+                      </Button>
+                    </HStack>
+                  </CardHeader>
+                  <CardBody>
+                    {selectedUser ? (
+                      <Box overflowX="auto">
+                        <Table size="sm" variant="striped">
+                          <Thead bg="gray.100">
+                            <Tr>
+                              <Th>Fonction</Th>
+                              <Th textAlign="center">Accès</Th>
+                              <Th textAlign="center">Lecture</Th>
+                              <Th textAlign="center">Écriture</Th>
+                              <Th>Expiration</Th>
+                              <Th>Actions</Th>
+                            </Tr>
+                          </Thead>
+                          <Tbody>
+                            {Object.entries(userPermissions).map(([funcId, perms]) => (
+                              <Tr key={funcId}>
+                                <Td>{funcId}</Td>
+                                <Td textAlign="center">
+                                  {perms.access && <Badge colorScheme="green">✓</Badge>}
+                                </Td>
+                                <Td textAlign="center">
+                                  {perms.read && <Badge colorScheme="green">✓</Badge>}
+                                </Td>
+                                <Td textAlign="center">
+                                  {perms.write && <Badge colorScheme="green">✓</Badge>}
+                                </Td>
+                                <Td fontSize="sm">{perms.expiresAt || 'Jamais'}</Td>
+                                <Td>
+                                  <Button
+                                    leftIcon={<ChakraDeleteIcon />}
+                                    size="xs"
+                                    colorScheme="red"
+                                    onClick={() => handleRevokePermission(perms.id)}
+                                  >
+                                    Révoquer
+                                  </Button>
+                                </Td>
+                              </Tr>
+                            ))}
+                          </Tbody>
+                        </Table>
+                      </Box>
+                    ) : (
+                      <Text fontSize="sm" color="gray.600">
+                        Sélectionnez un utilisateur pour voir ses permissions
+                      </Text>
+                    )}
+                  </CardBody>
+                </Card>
+              </GridItem>
+            </Grid>
+          </TabPanel>
+
+          {/* TAB 3: Audit et logs */}
+          <TabPanel>
             <Card>
-              <CardHeader title="Utilisateurs" />
-              <CardContent>
-                <TextField
-                  fullWidth
-                  placeholder="Rechercher un utilisateur..."
-                  size="small"
-                  sx={{ mb: 2 }}
-                />
-                <Typography variant="body2" color="textSecondary">
-                  Chargement des utilisateurs...
-                </Typography>
-              </CardContent>
+              <CardHeader>
+                <Heading size="md">Audit des permissions</Heading>
+              </CardHeader>
+              <CardBody>
+                <Text color="gray.600">
+                  Historique des modifications de permissions (en développement)
+                </Text>
+              </CardBody>
             </Card>
-          </Grid>
+          </TabPanel>
+        </TabPanels>
+      </Tabs>
 
-          <Grid item xs={12} md={8}>
-            <Card>
-              <CardHeader 
-                title="Permissions" 
-                action={
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    startIcon={<AddIcon />}
-                    onClick={() => setGrantDialog(true)}
+      {/* Modal pour accorder une permission */}
+      <Modal isOpen={isOpen} onClose={onClose}>
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>Accorder une permission</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <VStack spacing={4}>
+              <FormControl>
+                <FormLabel>Utilisateur</FormLabel>
+                <Select
+                  value={grantData.userId}
+                  onChange={(e) => setGrantData({ ...grantData, userId: e.target.value })}
+                >
+                  <option value="">Sélectionner...</option>
+                  {users.map(user => (
+                    <option key={user.id} value={user.id}>
+                      {user.firstName} {user.lastName} ({user.email})
+                    </option>
+                  ))}
+                </Select>
+              </FormControl>
+
+              <FormControl>
+                <FormLabel>Fonction</FormLabel>
+                <Select
+                  value={grantData.functionId}
+                  onChange={(e) => setGrantData({ ...grantData, functionId: e.target.value })}
+                >
+                  <option value="">Sélectionner...</option>
+                  {permissions.functions.map(func => (
+                    <option key={func.id} value={func.id}>
+                      {func.name} ({func.group})
+                    </option>
+                  ))}
+                </Select>
+              </FormControl>
+
+              <FormControl>
+                <FormLabel>Autorisations</FormLabel>
+                <Stack spacing={2}>
+                  <Checkbox
+                    isChecked={grantData.access}
+                    onChange={(e) => setGrantData({ ...grantData, access: e.target.checked })}
                   >
-                    Ajouter une permission
-                  </Button>
-                }
-              />
-              <CardContent>
-                {selectedUser ? (
-                  <TableContainer component={Paper}>
-                    <Table size="small">
-                      <TableHead>
-                        <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                          <TableCell sx={{ fontWeight: 'bold' }}>Fonction</TableCell>
-                          <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>Accès</TableCell>
-                          <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>Lecture</TableCell>
-                          <TableCell sx={{ fontWeight: 'bold', textAlign: 'center' }}>Écriture</TableCell>
-                          <TableCell sx={{ fontWeight: 'bold' }}>Expiration</TableCell>
-                          <TableCell sx={{ fontWeight: 'bold' }}>Actions</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {Object.entries(userPermissions).map(([funcId, perms]) => (
-                          <TableRow key={funcId}>
-                            <TableCell>{funcId}</TableCell>
-                            <TableCell align="center">
-                              {perms.access && <Chip label="✓" size="small" color="success" />}
-                            </TableCell>
-                            <TableCell align="center">
-                              {perms.read && <Chip label="✓" size="small" color="success" />}
-                            </TableCell>
-                            <TableCell align="center">
-                              {perms.write && <Chip label="✓" size="small" color="success" />}
-                            </TableCell>
-                            <TableCell>{perms.expiresAt || 'Jamais'}</TableCell>
-                            <TableCell>
-                              <Button
-                                size="small"
-                                color="error"
-                                startIcon={<DeleteIcon />}
-                                onClick={() => handleRevokePermission(perms.id)}
-                              >
-                                Révoquer
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
-                ) : (
-                  <Typography variant="body2" color="textSecondary">
-                    Sélectionnez un utilisateur pour voir ses permissions
-                  </Typography>
-                )}
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
-      </TabPanel>
+                    Accès
+                  </Checkbox>
+                  <Checkbox
+                    isChecked={grantData.read}
+                    onChange={(e) => setGrantData({ ...grantData, read: e.target.checked })}
+                  >
+                    Lecture
+                  </Checkbox>
+                  <Checkbox
+                    isChecked={grantData.write}
+                    onChange={(e) => setGrantData({ ...grantData, write: e.target.checked })}
+                  >
+                    Écriture
+                  </Checkbox>
+                </Stack>
+              </FormControl>
 
-      {/* TAB 3: Audit et logs */}
-      <TabPanel value={tabValue} index={2}>
-        <Card>
-          <CardHeader title="Audit des permissions" />
-          <CardContent>
-            <Typography variant="body2" color="textSecondary">
-              Historique des modifications de permissions (en développement)
-            </Typography>
-          </CardContent>
-        </Card>
-      </TabPanel>
-
-      {/* Dialog pour accorder une permission */}
-      <MuiDialog open={grantDialog} onClose={() => setGrantDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Accorder une permission</DialogTitle>
-        <DialogContent sx={{ pt: 2 }}>
-          <TextField
-            fullWidth
-            label="Utilisateur"
-            select
-            value={grantData.userId}
-            onChange={(e) => setGrantData({ ...grantData, userId: e.target.value })}
-            margin="normal"
-          >
-            {users.map(user => (
-              <MenuItem key={user.id} value={user.id}>
-                {user.name} ({user.email})
-              </MenuItem>
-            ))}
-          </TextField>
-
-          <TextField
-            fullWidth
-            label="Fonction"
-            select
-            value={grantData.functionId}
-            onChange={(e) => setGrantData({ ...grantData, functionId: e.target.value })}
-            margin="normal"
-          >
-            {permissions.functions.map(func => (
-              <MenuItem key={func.id} value={func.id}>
-                {func.name} ({func.group})
-              </MenuItem>
-            ))}
-          </TextField>
-
-          <Box sx={{ mt: 2 }}>
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={grantData.access}
-                  onChange={(e) => setGrantData({ ...grantData, access: e.target.checked })}
+              <FormControl>
+                <FormLabel>Expiration (optionnel)</FormLabel>
+                <Input
+                  type="datetime-local"
+                  value={grantData.expiresAt || ''}
+                  onChange={(e) => setGrantData({ ...grantData, expiresAt: e.target.value })}
                 />
-              }
-              label="Accès"
-            />
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={grantData.read}
-                  onChange={(e) => setGrantData({ ...grantData, read: e.target.checked })}
-                />
-              }
-              label="Lecture"
-            />
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={grantData.write}
-                  onChange={(e) => setGrantData({ ...grantData, write: e.target.checked })}
-                />
-              }
-              label="Écriture"
-            />
-          </Box>
+              </FormControl>
+            </VStack>
+          </ModalBody>
 
-          <TextField
-            fullWidth
-            label="Expiration (optionnel)"
-            type="datetime-local"
-            value={grantData.expiresAt || ''}
-            onChange={(e) => setGrantData({ ...grantData, expiresAt: e.target.value })}
-            margin="normal"
-            InputLabelProps={{ shrink: true }}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setGrantDialog(false)}>Annuler</Button>
-          <Button onClick={handleGrantPermission} variant="contained" color="primary">
-            Accorder
-          </Button>
-        </DialogActions>
-      </MuiDialog>
+          <ModalFooter>
+            <Button variant="ghost" mr={3} onClick={onClose}>
+              Annuler
+            </Button>
+            <Button colorScheme="blue" onClick={handleGrantPermission}>
+              Accorder
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </Container>
   );
 }

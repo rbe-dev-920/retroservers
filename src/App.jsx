@@ -41,6 +41,7 @@ import AttendancePage from "./pages/AttendancePage";
 import AttendanceManager from "./pages/AttendanceManager";
 import RetroRequests from "./pages/RetroRequests";
 import PresidentDashboard from "./pages/PresidentDashboard";
+import PermissionsManager from "./components/PermissionsManager";
 
 export default function App() {
   const { isAuthenticated } = useUser();
@@ -95,6 +96,9 @@ export default function App() {
         <Route path="/dashboard/members-management" element={<RoleProtectedRoute deniedRoles={['CLIENT', 'GUEST']}><MembersManagement /></RoleProtectedRoute>} />
         <Route path="/members" element={<ProtectedRoute><Members /></ProtectedRoute>} />
         <Route path="/adhesion" element={<ProtectedRoute><Adhesion /></ProtectedRoute>} />
+        
+        {/* 🔐 Gestion des permissions */}
+        <Route path="/dashboard/permissions" element={<RoleProtectedRoute allowedRoles={['ADMIN']}><PermissionsManager /></RoleProtectedRoute>} />
         
         {/* 📧 Communication */}
         <Route path="/dashboard/newsletter" element={<RoleProtectedRoute deniedRoles={['CLIENT', 'GUEST']}><Newsletter /></RoleProtectedRoute>} />
