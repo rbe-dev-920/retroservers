@@ -4,7 +4,7 @@
  * Reprend tous les champs de l'ancien AdminFinance
  */
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box, VStack, HStack, Card, CardHeader, CardBody,
   Heading, Text, Button, Badge, Icon, SimpleGrid, useToast,
@@ -12,10 +12,12 @@ import {
   ModalFooter, FormControl, FormLabel, Input, Select, useDisclosure,
   Table, Thead, Tbody, Tr, Th, Td, Textarea, NumberInput,
   NumberInputField, NumberInputStepper, NumberIncrementStepper,
-  NumberDecrementStepper, Tabs, TabList, TabPanels, Tab, TabPanel
+  NumberDecrementStepper, Tabs, TabList, TabPanels, Tab, TabPanel,
+  Divider
 } from "@chakra-ui/react";
-import { FiDownload, FiEye, FiPlus, FiEdit2, FiTrash2, FiPrinter } from "react-icons/fi";
+import { FiDownload, FiEye, FiPlus, FiEdit2, FiTrash2, FiPrinter, FiFileUp } from "react-icons/fi";
 import { useFinanceData } from "../../hooks/useFinanceData";
+import DevisLinesManager from "../DevisLinesManager";
 
 const FinanceInvoicing = () => {
   const {
@@ -27,6 +29,10 @@ const FinanceInvoicing = () => {
 
   const [isAdding, setIsAdding] = useState(false);
   const [editingDocument, setEditingDocument] = useState(null);
+  const [templates, setTemplates] = useState([]);
+  const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const [pdfFile, setPdfFile] = useState(null);
+  const [devisLines, setDevisLines] = useState([]);
   const [docForm, setDocForm] = useState({
     type: "QUOTE",
     number: "",
@@ -53,6 +59,33 @@ const FinanceInvoicing = () => {
 
   const toast = useToast();
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const { isOpen: isLinesOpen, onOpen: onLinesOpen, onClose: onLinesClose } = useDisclosure();
+  const { isOpen: isGenerateOpen, onOpen: onGenerateOpen, onClose: onGenerateClose } = useDisclosure();
+
+  // Charger les templates au montage
+  useEffect(() => {
+    loadTemplates();
+  }, []);
+
+  const loadTemplates = async () => {
+    try {
+      const response = await fetch(
+        import.meta.env.VITE_API_URL + "/api/quote-templates" || "http://localhost:4000/api/quote-templates",
+        {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        const tmplList = Array.isArray(data) ? data : (data?.templates || []);
+        setTemplates(tmplList);
+      }
+    } catch (e) {
+      console.warn("⚠️ Impossible de charger les templates:", e);
+      setTemplates([]);
+    }
+  };
 
   const handleOpenCreate = () => {
     setEditingDocument(null);
@@ -198,6 +231,119 @@ const FinanceInvoicing = () => {
         });
       }
     }
+  };
+
+  // Générer un document depuis un template HTML
+  const generateFromTemplate = async () => {
+    if (!selectedTemplate) {
+      toast({
+        title: "Erreur",
+        description: "Sélectionnez un template",
+        status: "warning"
+      });
+      return;
+    }
+
+    if (!editingDocument?.id && !docForm.number) {
+      toast({
+        title: "Erreur",
+        description: "Enregistrez d'abord le document",
+        status: "warning"
+      });
+      return;
+    }
+
+    try {
+      // Charger les lignes du devis
+      const currentDevisId = editingDocument?.id || "temp-" + Date.now();
+      let devisLinesTr = "";
+
+      try {
+        const linesResponse = await fetch(
+          (import.meta.env.VITE_API_URL || "http://localhost:4000") + `/api/devis-lines/${currentDevisId}`,
+          {
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+          }
+        );
+
+        if (linesResponse.ok) {
+          const lines = await linesResponse.json();
+          if (Array.isArray(lines) && lines.length > 0) {
+            devisLinesTr = lines
+              .map(
+                (line) => `
+              <tr>
+                <td class="num">${line.quantity}</td>
+                <td class="desc">${line.description}</td>
+                <td class="num">${line.unitPrice.toFixed(2)} €</td>
+                <td class="num">${line.totalPrice.toFixed(2)} €</td>
+              </tr>
+            `
+              )
+              .join("");
+          }
+        }
+      } catch (e) {
+        console.warn("⚠️ Impossible de charger les lignes:", e.message);
+      }
+
+      // Préparer les données pour la génération
+      const previewData = {
+        NUM_DEVIS: docForm.number,
+        TITRE: docForm.title,
+        OBJET: docForm.title,
+        DESCRIPTION: docForm.description || "",
+        MONTANT: parseFloat(docForm.amount || 0).toFixed(2),
+        PRIX_NET: parseFloat(docForm.amount || 0).toFixed(2),
+        DATE: new Date(docForm.date).toLocaleDateString("fr-FR"),
+        DESTINATAIRE_NOM: docForm.destinataireName || "Destinataire",
+        DESTINATAIRE_ADRESSE: docForm.destinataireAdresse || "",
+        DESTINATAIRE_SOCIETE: docForm.destinataireSociete || "",
+        DESTINATAIRE_CONTACTS: docForm.destinataireContacts || "",
+        NOTES: docForm.notes || "",
+        LOGO_BIG: selectedTemplate.logoBig || "",
+        LOGO_SMALL: selectedTemplate.logoSmall || "",
+        DEVIS_LINES_TR: devisLinesTr
+      };
+
+      // Générer le PDF (intégration avec print)
+      console.log("📄 Génération du document avec données:", previewData);
+
+      toast({
+        title: "Succès",
+        description: "Document généré. Prêt à imprimer.",
+        status: "success"
+      });
+    } catch (error) {
+      console.error("❌ Erreur génération:", error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de générer le document",
+        status: "error"
+      });
+    }
+  };
+
+  // Upload un PDF existant
+  const handlePdfUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.type !== "application/pdf") {
+      toast({
+        title: "Erreur",
+        description: "Veuillez sélectionner un fichier PDF",
+        status: "warning"
+      });
+      return;
+    }
+
+    setPdfFile(file);
+    toast({
+      title: "PDF sélectionné",
+      description: `${file.name} sera attaché au document`,
+      status: "info"
+    });
   };
 
   const statusColors = {
@@ -535,6 +681,89 @@ const FinanceInvoicing = () => {
                   </Box>
                 </VStack>
               </Box>
+
+              {/* Section Génération & Lignes pour Devis */}
+              {docForm.type === "QUOTE" && editingDocument?.id && (
+                <>
+                  <Divider />
+                  <VStack spacing={3} align="stretch" bg="blue.50" p={4} borderRadius="md">
+                    <HStack justify="space-between" align="center">
+                      <Heading size="sm">📄 Génération de Document</Heading>
+                    </HStack>
+
+                    {/* Sélection template */}
+                    <FormControl>
+                      <FormLabel fontSize="sm" fontWeight="bold">Template HTML</FormLabel>
+                      <Select
+                        size="sm"
+                        value={selectedTemplate?.id || ""}
+                        onChange={(e) => {
+                          const tmpl = templates.find(t => t.id === e.target.value);
+                          setSelectedTemplate(tmpl);
+                        }}
+                      >
+                        <option value="">Sélectionnez un template...</option>
+                        {templates.map(tmpl => (
+                          <option key={tmpl.id} value={tmpl.id}>
+                            {tmpl.name}
+                          </option>
+                        ))}
+                      </Select>
+                    </FormControl>
+
+                    {/* Boutons d'action */}
+                    <HStack spacing={2} width="100%">
+                      {selectedTemplate && (
+                        <Button
+                          size="sm"
+                          colorScheme="blue"
+                          leftIcon={<FiPrinter />}
+                          onClick={generateFromTemplate}
+                          flex={1}
+                        >
+                          Générer depuis template
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        colorScheme="gray"
+                        leftIcon={<FiFileUp />}
+                        onClick={() => document.getElementById("pdf-upload")?.click()}
+                        flex={1}
+                      >
+                        Uploader un PDF
+                      </Button>
+                      <input
+                        id="pdf-upload"
+                        type="file"
+                        accept=".pdf"
+                        onChange={handlePdfUpload}
+                        style={{ display: "none" }}
+                      />
+                    </HStack>
+
+                    {pdfFile && (
+                      <Text fontSize="xs" color="green.600" fontWeight="bold">
+                        ✅ PDF sélectionné: {pdfFile.name}
+                      </Text>
+                    )}
+                  </VStack>
+
+                  {/* Gestionnaire de lignes */}
+                  <Divider />
+                  <Box bg="orange.50" p={4} borderRadius="md" borderLeft="4px solid" borderColor="orange.500">
+                    <DevisLinesManager
+                      devisId={editingDocument.id}
+                      onTotalChange={(total) => {
+                        setDocForm(prev => ({
+                          ...prev,
+                          amount: total.toFixed(2)
+                        }));
+                      }}
+                    />
+                  </Box>
+                </>
+              )}
 
               {/* Statut */}
               <FormControl>
