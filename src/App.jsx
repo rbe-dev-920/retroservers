@@ -15,6 +15,7 @@ import DashboardHome from "./pages/DashboardHome";
 import MyRBE from "./pages/MyRBE";
 import MyRBEActions from "./pages/MyRBEActions";
 import AdminFinance from "./pages/AdminFinance";
+import FinanceNew from "./pages/FinanceNew";
 import Vehicules from "./pages/Vehicules";
 import VehiculeShow from "./pages/VehiculeShow";
 import VehiculeCreate from "./pages/VehiculeCreate";
@@ -70,6 +71,7 @@ export default function App() {
         
         {/* 💰 Route gestion financière */}
         <Route path="/admin/finance" element={<RoleProtectedRoute deniedRoles={['CLIENT', 'GUEST']}><AdminFinance /></RoleProtectedRoute>} />
+        <Route path="/admin/finance-v2" element={<RoleProtectedRoute allowedRoles={['ADMIN', 'PRESIDENT', 'TRESORIER']}><FinanceNew /></RoleProtectedRoute>} />
         
         {/* 🚗 Routes des véhicules */}
         <Route path="/dashboard/vehicules" element={<RoleProtectedRoute deniedRoles={['CLIENT', 'GUEST']}><Vehicules /></RoleProtectedRoute>} />
