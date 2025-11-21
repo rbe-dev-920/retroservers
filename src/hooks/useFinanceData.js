@@ -583,12 +583,6 @@ export const useFinanceData = (currentUser = null) => {
         if (!res.ok) throw new Error("Erreur mise à jour statut");
 
         const updatedDoc = await res.json();
-        // Normaliser: ajouter le champ status unifié
-        const normalizedDoc = {
-          ...updatedDoc,
-          status: updatedDoc.type === 'QUOTE' ? updatedDoc.quoteStatus : updatedDoc.invoiceStatus
-        };
-        setDocuments(documents.map(d => d.id === documentId ? normalizedDoc : d));
         toast({
           title: "Succès",
           description: "Statut mis à jour",
@@ -596,7 +590,7 @@ export const useFinanceData = (currentUser = null) => {
         });
         // Recharger les données pour synchroniser
         await loadFinanceData();
-        return normalizedDoc;
+        return updatedDoc;
       } catch (error) {
         toast({
           title: "Erreur",
@@ -606,7 +600,7 @@ export const useFinanceData = (currentUser = null) => {
         return null;
       }
     },
-    [documents, toast]
+    [toast]
   );
 
   return {
