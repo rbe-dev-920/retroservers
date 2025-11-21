@@ -119,13 +119,27 @@ const TemplateManagement = () => {
         return;
       }
 
+      // Préparer les données SANS les images (qui restent en base64)
+      const dataToSend = {
+        name: formData.name,
+        description: formData.description,
+        htmlContent: formData.htmlContent,
+        isDefault: formData.isDefault,
+        // Les images base64 doivent être filtrées si trop grandes
+        ...(formData.logoSmall && formData.logoSmall.length < 500000 ? { logoSmall: formData.logoSmall } : {}),
+        ...(formData.logoBig && formData.logoBig.length < 500000 ? { logoBig: formData.logoBig } : {}),
+      };
+
       const response = await fetch(`/api/quote-templates/${selectedTemplate.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(dataToSend),
       });
 
-      if (!response.ok) throw new Error('Failed to update template');
+      if (!response.ok) {
+        const errorData = await response.text();
+        throw new Error(`Failed to update template: ${errorData || response.statusText}`);
+      }
 
       toast({
         title: 'Succès',
@@ -137,6 +151,7 @@ const TemplateManagement = () => {
       resetForm();
       editDisclosure.onClose();
     } catch (err) {
+      console.error('Error updating template:', err);
       toast({ title: 'Erreur', description: err.message, status: 'error' });
     }
   };
