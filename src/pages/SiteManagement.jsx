@@ -19,7 +19,7 @@ import {
   FiEdit, FiTrash2, FiPlus, FiUsers, FiKey, FiEye, FiShield,
   FiUserCheck, FiUserX, FiLink, FiSearch, FiGlobe, FiLock,
   FiUnlock, FiRefreshCw, FiSettings, FiActivity, FiMail, FiBell,
-  FiChevronLeft, FiChevronRight
+  FiChevronLeft, FiChevronRight, FiExternalLinkAlt
 } from 'react-icons/fi';
 import { apiClient } from '../api/config';
 import { API_BASE_URL } from '../api/config';
@@ -1187,6 +1187,12 @@ export default function SiteManagement() {
   const [helloAssoLink, setHelloAssoLink] = useState(
     localStorage.getItem('rbe_site_helloasso_url') || 'https://www.helloasso.com/associations/retrobus-essonne'
   );
+  // State pour RétroActus diffusion
+  const [diffusionForm, setDiffusionForm] = useState({
+    title: '',
+    content: '',
+    destinationUrl: ''
+  });
   
   const { isOpen, onOpen, onClose } = useDisclosure();
   const {
@@ -1198,6 +1204,11 @@ export default function SiteManagement() {
     isOpen: isTemplatesOpen,
     onOpen: onOpenTemplates,
     onClose: onCloseTemplates
+  } = useDisclosure();
+  const {
+    isOpen: isDiffusionOpen,
+    onOpen: onOpenDiffusionModal,
+    onClose: onCloseDiffusionModal
   } = useDisclosure();
   const toast = useToast();
 
@@ -1318,6 +1329,60 @@ export default function SiteManagement() {
       toast({ title: 'Config détectée', description: `helloAssoUrl=${data.helloAssoUrl || 'non défini'}`, status: 'success', duration: 3000 });
     } catch (e) {
       toast({ title: 'Config indisponible', description: `${e.message}${e.urlsTried ? ` • Testé: ${e.urlsTried.join(', ')}` : ''}`, status: 'warning', duration: 5000 });
+    }
+  };
+
+  // Diffuser une RétroActus
+  const handleDiffuseRetroActus = async () => {
+    try {
+      if (!diffusionForm.title.trim() || !diffusionForm.content.trim()) {
+        toast({
+          title: 'Erreur de validation',
+          description: 'Le titre et le contenu sont requis',
+          status: 'error',
+          duration: 3000,
+          isClosable: true,
+        });
+        return;
+      }
+
+      // Utiliser Web Share API si disponible
+      if (navigator.share) {
+        await navigator.share({
+          title: diffusionForm.title,
+          text: diffusionForm.content,
+          url: diffusionForm.destinationUrl || window.location.href
+        });
+      } else {
+        // Fallback: créer un lien de partage
+        const shareText = `${diffusionForm.title}\n\n${diffusionForm.content}\n\n${diffusionForm.destinationUrl || ''}`;
+        const encodedShare = encodeURIComponent(shareText);
+        const subject = encodeURIComponent(`RétroActus: ${diffusionForm.title}`);
+        
+        // Ouvrir email avec contenu pré-rempli
+        window.location.href = `mailto:?subject=${subject}&body=${encodedShare}`;
+      }
+
+      toast({
+        title: 'Succès',
+        description: 'RétroActus diffusée avec succès',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      });
+
+      // Réinitialiser et fermer
+      setDiffusionForm({ title: '', content: '', destinationUrl: '' });
+      onCloseDiffusionModal();
+    } catch (error) {
+      console.error('Erreur diffusion:', error);
+      toast({
+        title: 'Erreur',
+        description: 'Impossible de diffuser la RétroActus',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
     }
   };
 
@@ -1735,6 +1800,28 @@ export default function SiteManagement() {
                     </VStack>
                   </CardBody>
                 </Card>
+
+                <Card bg={cardBg}>
+                  <CardHeader>
+                    <Heading size="sm">📰 Diffusion RétroActus</Heading>
+                  </CardHeader>
+                  <CardBody>
+                    <VStack spacing={3} align="stretch">
+                      <Text fontSize="xs" color="gray.600">
+                        Partagez une actualité sur le site externe
+                      </Text>
+                      <Button 
+                        leftIcon={<FiExternalLinkAlt />} 
+                        size="sm" 
+                        variant="outline"
+                        colorScheme="orange"
+                        onClick={onOpenDiffusionModal}
+                      >
+                        📢 Diffuser une RétroActus
+                      </Button>
+                    </VStack>
+                  </CardBody>
+                </Card>
               </SimpleGrid>
             </TabPanel>
 
@@ -1963,6 +2050,63 @@ export default function SiteManagement() {
               <Button variant="ghost" mr={3} onClick={onClose}>Annuler</Button>
               <Button colorScheme="blue" onClick={handleSave}>
                 {selectedChangelog ? 'Enregistrer' : 'Créer'}
+              </Button>
+            </ModalFooter>
+          </ModalContent>
+        </Modal>
+
+        {/* Modal Diffusion RétroActus */}
+        <Modal isOpen={isDiffusionOpen} onClose={onCloseDiffusionModal} size="lg">
+          <ModalOverlay />
+          <ModalContent>
+            <ModalHeader>📢 Diffuser une RétroActus</ModalHeader>
+            <ModalCloseButton />
+            <ModalBody>
+              <VStack spacing={4}>
+                <FormControl isRequired>
+                  <FormLabel>Titre</FormLabel>
+                  <Input
+                    placeholder="Titre de l'actualité..."
+                    value={diffusionForm.title}
+                    onChange={(e) => setDiffusionForm(prev => ({ ...prev, title: e.target.value }))}
+                  />
+                </FormControl>
+
+                <FormControl isRequired>
+                  <FormLabel>Contenu</FormLabel>
+                  <Textarea
+                    placeholder="Contenu à partager..."
+                    value={diffusionForm.content}
+                    onChange={(e) => setDiffusionForm(prev => ({ ...prev, content: e.target.value }))}
+                    rows={6}
+                  />
+                </FormControl>
+
+                <FormControl>
+                  <FormLabel>URL de destination (optionnelle)</FormLabel>
+                  <Input
+                    type="url"
+                    placeholder="https://..."
+                    value={diffusionForm.destinationUrl}
+                    onChange={(e) => setDiffusionForm(prev => ({ ...prev, destinationUrl: e.target.value }))}
+                  />
+                </FormControl>
+
+                <Alert status="info">
+                  <AlertIcon />
+                  <Text fontSize="sm">
+                    Votre RétroActus sera partagée via email ou les fonctions de partage disponibles
+                  </Text>
+                </Alert>
+              </VStack>
+            </ModalBody>
+
+            <ModalFooter>
+              <Button variant="ghost" mr={3} onClick={onCloseDiffusionModal}>
+                Annuler
+              </Button>
+              <Button colorScheme="orange" onClick={handleDiffuseRetroActus}>
+                📤 Diffuser
               </Button>
             </ModalFooter>
           </ModalContent>
