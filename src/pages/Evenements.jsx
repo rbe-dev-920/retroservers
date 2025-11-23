@@ -200,99 +200,6 @@ const Evenements = () => {
     eventType: 'public_info_only'
   });
 
-  // Test API pour diagnostiquer l'erreur 400
-  const testAPIConnection = async () => {
-    const token = localStorage.getItem('token');
-    console.log('🔍 Testing API connection...');
-    console.log('Token exists:', !!token);
-    
-    if (!token) {
-      toast({ status: "error", title: "Pas de token", description: "Veuillez vous reconnecter" });
-      return;
-    }
-
-    try {
-      // Test 1: GET events
-      const testResponse = await fetch('https://refreshing-adaptation-rbe-serveurs.up.railway.app/events', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      console.log('GET /events status:', testResponse.status);
-      
-      if (testResponse.ok) {
-        const data = await testResponse.json();
-        console.log('✅ GET API works, events:', data.length);
-        setEvents(Array.isArray(data) ? data : []);
-        
-        // Test 2: POST test event pour voir l'erreur exacte
-        console.log('🧪 Testing POST with minimal data...');
-        const testEventData = {
-          id: `test-${Date.now()}`,
-          title: 'Test Event',
-          date: '2025-12-31',
-          status: 'DRAFT'
-        };
-        
-        const postResponse = await fetch('https://refreshing-adaptation-rbe-serveurs.up.railway.app/events', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify(testEventData)
-        });
-        
-        console.log('POST /events status:', postResponse.status);
-        
-        if (postResponse.ok) {
-          const createdEvent = await postResponse.json();
-          console.log('✅ POST works, created:', createdEvent);
-          
-          // Nettoyer le test en supprimant l'événement créé
-          await fetch(`https://refreshing-adaptation-rbe-serveurs.up.railway.app/events/${testEventData.id}`, {
-            method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          
-          toast({ 
-            status: "success", 
-            title: "API entièrement fonctionnelle", 
-            description: "GET et POST fonctionnent correctement"
-          });
-        } else {
-          const errorText = await postResponse.text();
-          console.log('❌ POST error:', postResponse.status, errorText);
-          
-          toast({ 
-            status: "error", 
-            title: `Erreur POST ${postResponse.status}`, 
-            description: errorText
-          });
-        }
-      } else {
-        const errorText = await testResponse.text();
-        console.log('❌ GET error:', testResponse.status, errorText);
-        
-        toast({ 
-          status: "error", 
-          title: `Erreur GET ${testResponse.status}`, 
-          description: errorText
-        });
-      }
-    } catch (error) {
-      console.error('Network error:', error);
-      toast({ 
-        status: "error", 
-        title: "Erreur réseau", 
-        description: error.message
-      });
-    }
-  };
-
   const fetchEvents = useCallback(async () => {
     try {
       setLoading(true);
@@ -897,15 +804,6 @@ const Evenements = () => {
         </VStack>
         <HStack spacing={3}>
           <Button
-            leftIcon={<FiEdit />}
-            size="sm"
-            colorScheme="purple"
-            variant="outline"
-            onClick={testAPIConnection}
-          >
-            Tester API
-          </Button>
-          <Button
             leftIcon={viewMode === 'cards' ? <FiList /> : <FiGrid />}
             size="sm"
             variant="outline"
@@ -931,14 +829,9 @@ const Evenements = () => {
         <Center py={20}>
           <VStack spacing={4}>
             <Text color="gray.500" fontSize="lg">Aucun événement trouvé</Text>
-            <HStack spacing={3}>
-              <Button leftIcon={<FiEdit />} colorScheme="purple" variant="outline" onClick={testAPIConnection}>
-                Tester API
-              </Button>
-              <Button leftIcon={<FiPlus />} colorScheme="blue" onClick={handleCreate}>
-                Créer le premier événement
-              </Button>
-            </HStack>
+            <Button leftIcon={<FiPlus />} colorScheme="blue" onClick={handleCreate}>
+              Créer le premier événement
+            </Button>
           </VStack>
         </Center>
       ) : viewMode === 'cards' ? (

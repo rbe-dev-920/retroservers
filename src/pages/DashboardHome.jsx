@@ -45,9 +45,7 @@ export default function DashboardHome() {
     events: { total: 0, upcoming: 0, published: 0, loading: true },
     members: { total: 0, active: 0, loading: true }
   });
-  const [recentActivity, setRecentActivity] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [quickActions, setQuickActions] = useState([]);
   const [retroActus, setRetroActus] = useState([]);
   const [currentActuIndex, setCurrentActuIndex] = useState(0);
   
@@ -109,6 +107,46 @@ export default function DashboardHome() {
     }
   };
 
+  const shareRetroActu = async (actu) => {
+    const subject = encodeURIComponent(`RétroActus: ${actu?.title || 'News'}`);
+    const body = encodeURIComponent(
+      `Découvrez cette actualité de RétroBus Essonne:\n\n` +
+      `${actu?.title || 'Sans titre'}\n\n` +
+      `${actu?.content || ''}\n\n` +
+      `Site: https://retrobus-essonne.fr`
+    );
+    window.location.href = `mailto:?subject=${subject}&body=${body}`;
+  };
+
+  const shareOnWeb = async (actu) => {
+    // Vérifie si l'API Web Share est disponible
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: actu?.title || 'RétroActus',
+          text: actu?.content || '',
+          url: 'https://retrobus-essonne.fr'
+        });
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          console.error('Erreur partage web:', err);
+        }
+      }
+    } else {
+      // Fallback: copier dans le presse-papiers
+      const textToCopy = `${actu?.title}\n${actu?.content}\nhttps://retrobus-essonne.fr`;
+      navigator.clipboard.writeText(textToCopy).then(() => {
+        toast({
+          title: "Copié!",
+          description: "L'actualité a été copiée dans le presse-papiers",
+          status: "success",
+          duration: 2000,
+          isClosable: true,
+        });
+      });
+    }
+  };
+
   const loadVehiclesData = async () => {
     try {
       console.log('📊 Chargement des véhicules...');
@@ -150,29 +188,6 @@ export default function DashboardHome() {
         ...prev,
         vehicles: vehicleStats
       }));
-
-      // Ajouter à l'activité récente si nouveaux véhicules
-      if (vehicles.length > 0) {
-        const recentVehicles = vehicles.filter(v => {
-          const created = new Date(v.createdAt || v.dateCreation || v.created_at);
-          const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-          return created > dayAgo;
-        });
-
-        if (recentVehicles.length > 0) {
-          setRecentActivity(prev => [
-            {
-              id: `vehicles-${Date.now()}`,
-              type: 'vehicle',
-              title: `${recentVehicles.length} nouveau(x) véhicule(s) ajouté(s)`,
-              time: 'Aujourd\'hui',
-              icon: FiTruck,
-              color: 'blue'
-            },
-            ...prev.filter(a => a.type !== 'vehicle')
-          ]);
-        }
-      }
 
     } catch (error) {
       console.error('❌ Erreur chargement véhicules:', error);
@@ -234,29 +249,6 @@ export default function DashboardHome() {
         events: eventStats
       }));
 
-      // Ajouter à l'activité récente si nouveaux événements
-      if (events.length > 0) {
-        const recentEvents = events.filter(e => {
-          const created = new Date(e.createdAt || e.dateCreation || e.created_at);
-          const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-          return created > dayAgo;
-        });
-
-        if (recentEvents.length > 0) {
-          setRecentActivity(prev => [
-            {
-              id: `events-${Date.now()}`,
-              type: 'event',
-              title: `${recentEvents.length} nouvel(s) événement(s) créé(s)`,
-              time: 'Aujourd\'hui',
-              icon: FiCalendar,
-              color: 'green'
-            },
-            ...prev.filter(a => a.type !== 'event')
-          ]);
-        }
-      }
-
     } catch (error) {
       console.error('❌ Erreur chargement événements:', error);
       setStats(prev => ({
@@ -308,30 +300,6 @@ export default function DashboardHome() {
         ...prev,
         members: memberStats
       }));
-
-      // Ajouter à l'activité récente si nouveaux membres
-      if (members.length > 0) {
-        const recentMembers = members.filter(m => {
-          const created = new Date(m.createdAt || m.dateCreation || m.dateAdhesion || m.created_at);
-          const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-          return created > dayAgo;
-        });
-
-        if (recentMembers.length > 0) {
-          setRecentActivity(prev => [
-            {
-              id: `members-${Date.now()}`,
-              type: 'member',
-              title: `${recentMembers.length} nouvelle(s) adhésion(s)`,
-              time: 'Aujourd\'hui',
-              icon: FiUsers,
-              color: 'purple'
-            },
-            ...prev.filter(a => a.type !== 'member')
-          ]);
-        }
-      }
-
     } catch (error) {
       console.error('❌ Erreur chargement membres:', error);
       setStats(prev => ({
@@ -491,34 +459,6 @@ export default function DashboardHome() {
               </Card>
             </SimpleGrid>
 
-            {/* Actions rapides */}
-            <Card bg={cardBg} borderColor={borderColor} shadow="lg">
-              <CardHeader>
-                <Heading size="md" fontWeight="700">Actions rapides</Heading>
-              </CardHeader>
-              <CardBody>
-                <SimpleGrid columns={{ base: 2, md: 4 }} spacing={4}>
-                  {quickActions.map((action) => (
-                    <Button
-                      key={action.title}
-                      as={RouterLink}
-                      to={action.to}
-                      leftIcon={<Icon as={action.icon} />}
-                      colorScheme={action.color}
-                      variant="outline"
-                      size="sm"
-                      h="auto"
-                      py={4}
-                      flexDirection="column"
-                      textAlign="center"
-                    >
-                      {action.title}
-                    </Button>
-                  ))}
-                </SimpleGrid>
-              </CardBody>
-            </Card>
-
             {/* Les RétroActus */}
             {retroActus.length > 0 && (
               <Card bg={cardBg} borderColor={borderColor} shadow="lg">
@@ -582,52 +522,34 @@ export default function DashboardHome() {
                         borderRadius="md"
                       />
                     )}
+                    <HStack spacing={2} pt={4} w="100%">
+                      <Button
+                        size="sm"
+                        leftIcon={<FiShare2 />}
+                        colorScheme="blue"
+                        variant="outline"
+                        flex={1}
+                        onClick={() => shareOnWeb(retroActus[currentActuIndex])}
+                      >
+                        Partager
+                      </Button>
+                      <Button
+                        size="sm"
+                        leftIcon={<FiMail />}
+                        colorScheme="cyan"
+                        variant="outline"
+                        flex={1}
+                        onClick={() => shareRetroActu(retroActus[currentActuIndex])}
+                      >
+                        Email
+                      </Button>
+                    </HStack>
                   </VStack>
                 </CardBody>
               </Card>
             )}
 
-            {/* Activité récente */}
-            <Card bg={cardBg} borderColor={borderColor} shadow="lg">
-              <CardHeader>
-                <HStack justify="space-between">
-                  <Heading size="md" fontWeight="700">Activité récente</Heading>
-                  <IconButton
-                    icon={<FiRefreshCw />}
-                    size="sm"
-                    variant="ghost"
-                    onClick={loadDashboardData}
-                    title="Actualiser"
-                  />
-                </HStack>
-              </CardHeader>
-              <CardBody>
-                <VStack spacing={4} align="stretch">
-                  {recentActivity.length === 0 ? (
-                    <Text color="gray.500" textAlign="center" py={4}>
-                      Aucune activité récente
-                    </Text>
-                  ) : (
-                    recentActivity.slice(0, 5).map((activity) => (
-                      <HStack key={activity.id} spacing={4} p={3} bg="gray.50" borderRadius="lg">
-                        <Icon as={activity.icon} color={`${activity.color}.500`} />
-                        <VStack align="start" spacing={0} flex={1}>
-                          <Text fontWeight="600" fontSize="sm">
-                            {activity.title}
-                          </Text>
-                          <Text fontSize="xs" color="gray.500">
-                            {activity.time}
-                          </Text>
-                        </VStack>
-                        <Badge colorScheme={activity.color} variant="subtle">
-                          {activity.type}
-                        </Badge>
-                      </HStack>
-                    ))
-                  )}
-                </VStack>
-              </CardBody>
-            </Card>
+
           </VStack>
         </GridItem>
 
