@@ -124,16 +124,6 @@ const cards = [
     cardAccess: true
   },
   {
-    title: "Retromail",
-    description: "Messagerie interne de l'équipe",
-    to: "/retromail",
-    icon: FiInbox,
-    color: "teal",
-    resource: "RETROMAIL",
-    cardAccess: true,
-    hidden: true // Non utilisé sur MyRBE
-  },
-  {
     title: "RétroSupport",
     description: "Tickets: incidents, bugs et améliorations",
     to: "/dashboard/support",
@@ -141,14 +131,6 @@ const cards = [
     color: "cyan",
     resource: "RETROSUPPORT",
     cardAccess: true
-  },
-  {
-    title: "Mon Profil",
-    description: "Informations personnelles et permissions",
-    to: "/dashboard/profile",
-    icon: FiUsers,
-    color: "blue",
-    hidden: true // Non utilisé sur MyRBE
   }
 ];
 
