@@ -19,7 +19,7 @@ import {
   FiEdit, FiTrash2, FiPlus, FiUsers, FiKey, FiEye, FiShield,
   FiUserCheck, FiUserX, FiLink, FiSearch, FiGlobe, FiLock,
   FiUnlock, FiRefreshCw, FiSettings, FiActivity, FiMail, FiBell,
-  FiChevronLeft, FiChevronRight, FiExternalLinkAlt
+  FiChevronLeft, FiChevronRight, FiArrowUpRight
 } from 'react-icons/fi';
 import { apiClient } from '../api/config';
 import { API_BASE_URL } from '../api/config';
@@ -1811,7 +1811,7 @@ export default function SiteManagement() {
                         Partagez une actualité sur le site externe
                       </Text>
                       <Button 
-                        leftIcon={<FiExternalLinkAlt />} 
+                        leftIcon={<FiArrowUpRight />} 
                         size="sm" 
                         variant="outline"
                         colorScheme="orange"
