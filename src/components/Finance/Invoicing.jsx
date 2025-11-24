@@ -441,7 +441,9 @@ const FinanceInvoicing = () => {
       };
 
       // Générer PDF
-      html2pdf().set(opt).from(element).toPdf().output("datauristring", async (pdfDataUri) => {
+      try {
+        const pdfDataUri = await html2pdf().set(opt).from(element).output("datauristring");
+        
         // Sauvegarder le PDF généré dans la base de données
         if (editingDocument?.id) {
           try {
@@ -464,48 +466,57 @@ const FinanceInvoicing = () => {
 
         // Ouvrir aperçu dans une nouvelle fenêtre
         const newWindow = window.open("", "_blank");
-        newWindow.document.write(`
-          <html>
-            <head>
-              <title>Aperçu - ${docForm.type === "QUOTE" ? "Devis" : "Facture"} ${docForm.number}</title>
-              <style>
-                body { margin: 0; padding: 10px; font-family: Arial, sans-serif; }
-                #pdfContainer { width: 100%; height: 90vh; }
-                #downloadBtn { 
-                  padding: 10px 20px; 
-                  background: #4CAF50; 
-                  color: white; 
-                  border: none; 
-                  border-radius: 4px; 
-                  cursor: pointer; 
-                  font-size: 16px;
-                  margin-bottom: 10px;
-                }
-                #downloadBtn:hover { background: #45a049; }
-              </style>
-            </head>
-            <body>
-              <button id="downloadBtn" onclick="downloadPDF()">⬇️ Télécharger PDF</button>
-              <iframe id="pdfContainer" src="${pdfDataUri}" type="application/pdf"></iframe>
-              <script>
-                function downloadPDF() {
-                  const link = document.createElement('a');
-                  link.href = "${pdfDataUri}";
-                  link.download = "${docForm.type === "QUOTE" ? "Devis" : "Facture"}_${docForm.number}.pdf";
-                  link.click();
-                }
-              </script>
-            </body>
-          </html>
-        `);
-        newWindow.document.close();
-      });
+        if (newWindow) {
+          newWindow.document.write(`
+            <html>
+              <head>
+                <title>Aperçu - ${docForm.type === "QUOTE" ? "Devis" : "Facture"} ${docForm.number}</title>
+                <style>
+                  body { margin: 0; padding: 10px; font-family: Arial, sans-serif; }
+                  #pdfContainer { width: 100%; height: 90vh; }
+                  #downloadBtn { 
+                    padding: 10px 20px; 
+                    background: #4CAF50; 
+                    color: white; 
+                    border: none; 
+                    border-radius: 4px; 
+                    cursor: pointer; 
+                    font-size: 16px;
+                    margin-bottom: 10px;
+                  }
+                  #downloadBtn:hover { background: #45a049; }
+                </style>
+              </head>
+              <body>
+                <button id="downloadBtn" onclick="downloadPDF()">⬇️ Télécharger PDF</button>
+                <iframe id="pdfContainer" src="${pdfDataUri}" type="application/pdf"></iframe>
+                <script>
+                  function downloadPDF() {
+                    const link = document.createElement('a');
+                    link.href = "${pdfDataUri}";
+                    link.download = "${docForm.type === "QUOTE" ? "Devis" : "Facture"}_${docForm.number}.pdf";
+                    link.click();
+                  }
+                </script>
+              </body>
+            </html>
+          `);
+          newWindow.document.close();
+        }
 
-      toast({
-        title: "Succès",
-        description: "PDF généré ! Aperçu et téléchargement disponibles.",
-        status: "success"
-      });
+        toast({
+          title: "Succès",
+          description: "PDF généré ! Aperçu et téléchargement disponibles.",
+          status: "success"
+        });
+      } catch (error) {
+        console.error("❌ Erreur génération PDF:", error);
+        toast({
+          title: "Erreur",
+          description: "Impossible de générer le PDF: " + error.message,
+          status: "error"
+        });
+      }
     } catch (error) {
       console.error("❌ Erreur génération:", error);
       toast({
