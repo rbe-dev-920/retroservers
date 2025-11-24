@@ -627,6 +627,16 @@ export default function DashboardHome() {
                   </Button>
                   <Button
                     as={RouterLink}
+                    to="/dashboard/myrbe"
+                    variant="ghost"
+                    justifyContent="flex-start"
+                    leftIcon={<FiBarChart />}
+                    size="sm"
+                  >
+                    MyRBE
+                  </Button>
+                  <Button
+                    as={RouterLink}
                     to="/admin"
                     variant="ghost"
                     justifyContent="flex-start"
