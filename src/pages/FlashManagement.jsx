@@ -100,10 +100,10 @@ export default function FlashManagement() {
       setLoading(true);
       const response = await apiClient.get('/flashes');
       
-      if (response.data && Array.isArray(response.data)) {
-        setFlashes(response.data);
+      if (Array.isArray(response)) {
+        setFlashes(response);
       } else {
-        console.warn('Réponse inattendue de l\'API:', response.data);
+        console.warn('Réponse inattendue de l\'API:', response);
         setFlashes([]);
       }
     } catch (error) {

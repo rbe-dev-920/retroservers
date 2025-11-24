@@ -83,7 +83,7 @@ export default function DashboardHome() {
     try {
       // Charger les actualités publiées depuis l'API RetroNews
       const response = await apiClient.get('/api/retro-news');
-      const data = Array.isArray(response.data) ? response.data : [];
+      const data = Array.isArray(response) ? response : [];
       
       // Filtrer pour ne garder que les publiés et les trier (vedettes en premier)
       const published = data
@@ -490,11 +490,11 @@ export default function DashboardHome() {
                     <Heading size="sm" color="blue.600">
                       {retroActus[currentActuIndex]?.title || 'Sans titre'}
                     </Heading>
-                    {retroActus[currentActuIndex]?.date && (
+                    {retroActus[currentActuIndex]?.publishedAt && (
                       <HStack spacing={2} color="gray.500" fontSize="sm">
                         <Icon as={FiCalendar} />
                         <Text>
-                          {new Date(retroActus[currentActuIndex].date).toLocaleDateString('fr-FR', {
+                          {new Date(retroActus[currentActuIndex].publishedAt).toLocaleDateString('fr-FR', {
                             year: 'numeric',
                             month: 'long',
                             day: 'numeric'

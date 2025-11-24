@@ -153,10 +153,11 @@ export default function PermissionsManagement() {
     try {
       setLoading(true);
       const response = await api.get('/api/admin/users');
-      if (Array.isArray(response.data)) {
-        setUsers(response.data);
-      } else if (response.data?.users) {
-        setUsers(response.data.users);
+      if (Array.isArray(response)) {
+        setUsers(response);
+      } else {
+        console.error('Format inattendu pour les utilisateurs');
+        setUsers([]);
       }
     } catch (error) {
       console.error('Erreur chargement utilisateurs:', error);
@@ -174,8 +175,8 @@ export default function PermissionsManagement() {
   const loadUserPermissions = async (userId) => {
     try {
       const response = await api.get(`/api/admin/users/${userId}/permissions`);
-      if (response.data) {
-        setUserPermissions(response.data);
+      if (Array.isArray(response)) {
+        setUserPermissions(response);
       }
     } catch (error) {
       console.error('Erreur chargement permissions:', error);
