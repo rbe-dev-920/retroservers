@@ -399,6 +399,7 @@ export default function Header() {
               <Button as={RouterLink} to="/dashboard" variant="ghost" justifyContent="flex-start" onClick={navDrawer.onClose} py={4} px={5}>Accueil</Button>
               <Button as={RouterLink} to="/dashboard/vehicules" variant="ghost" justifyContent="flex-start" onClick={navDrawer.onClose} py={4} px={5}>Véhicules</Button>
               <Button as={RouterLink} to="/dashboard/evenements" variant="ghost" justifyContent="flex-start" onClick={navDrawer.onClose} py={4} px={5}>Événements</Button>
+              <Button as={RouterLink} to="/dashboard/myrbe" variant="ghost" justifyContent="flex-start" onClick={navDrawer.onClose} py={4} px={5}>MyRBE</Button>
               <Button as={RouterLink} to="/dashboard/retromerch" variant="ghost" justifyContent="flex-start" onClick={navDrawer.onClose} py={4} px={5}>RétroMerch</Button>
               <Divider />
               <Button onClick={() => { viewer.onOpen(); navDrawer.onClose(); }} variant="ghost" justifyContent="flex-start" py={4} px={5}>Voir les flashs</Button>

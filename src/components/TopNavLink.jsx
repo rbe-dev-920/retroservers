@@ -53,6 +53,7 @@ export function Navigation() {
   const canAccessHome = canAccess(userRole, RESOURCES.SITE_MANAGEMENT, customPermissions);
   const canAccessVehicles = canAccess(userRole, RESOURCES.VEHICLES, customPermissions);
   const canAccessEvents = canAccess(userRole, RESOURCES.EVENTS, customPermissions);
+  const canAccessMyRBE = canAccess(userRole, RESOURCES.MYRBE, customPermissions);
   const canAccessRetroMerch = canAccess(userRole, RESOURCES.NEWSLETTER, customPermissions); // Using NEWSLETTER as proxy for general access
   const canAccessRétroPlanning = canAccess(userRole, RESOURCES.RETROPLANNING, customPermissions);
   const canAccessRétroSupport = canAccess(userRole, RESOURCES.RETROSUPPORT, customPermissions);
@@ -73,6 +74,7 @@ export function Navigation() {
       {canAccessHome && <TopNavLink to="/dashboard">🏠 Accueil</TopNavLink>}
       {canAccessVehicles && <TopNavLink to="/dashboard/vehicules">🚗 Véhicules</TopNavLink>}
       {canAccessEvents && <TopNavLink to="/dashboard/evenements">📋 Événements</TopNavLink>}
+      {canAccessMyRBE && <TopNavLink to="/dashboard/myrbe">📊 MyRBE</TopNavLink>}
       {canAccessRetroMerch && <TopNavLink to="/dashboard/retromerch">🛍️ RétroMerch</TopNavLink>}
     </Flex>
   );
