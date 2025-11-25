@@ -760,7 +760,6 @@ const FinanceInvoicing = () => {
                           <Th>N°</Th>
                           <Th>Titre</Th>
                           <Th display={{ base: "none", md: "table-cell" }}>Date</Th>
-                          <Th display={{ base: "none", lg: "table-cell" }}>Échéance</Th>
                           <Th isNumeric>Montant</Th>
                           <Th display={{ base: "none", sm: "table-cell" }} isNumeric>Payé</Th>
                           <Th display={{ base: "none", sm: "table-cell" }}>Statut</Th>
@@ -778,9 +777,6 @@ const FinanceInvoicing = () => {
                             </Td>
                             <Td display={{ base: "none", md: "table-cell" }} fontSize="sm">
                               {new Date(doc.date).toLocaleDateString('fr-FR')}
-                            </Td>
-                            <Td display={{ base: "none", lg: "table-cell" }} fontSize="sm">
-                              {doc.dueDate ? new Date(doc.dueDate).toLocaleDateString('fr-FR') : '-'}
                             </Td>
                             <Td isNumeric fontWeight="bold" fontSize={{ base: "xs", md: "md" }}>
                               {parseFloat(doc.amount || 0).toFixed(2)} €
@@ -899,17 +895,6 @@ const FinanceInvoicing = () => {
                     onChange={(e) => setDocForm(prev => ({ ...prev, date: e.target.value }))}
                   />
                 </FormControl>
-                {docForm.type === "INVOICE" && (
-                  <FormControl>
-                    <FormLabel fontWeight="bold" fontSize="sm">Échéance</FormLabel>
-                    <Input
-                      type="date"
-                      size="sm"
-                      value={docForm.dueDate || ""}
-                      onChange={(e) => setDocForm(prev => ({ ...prev, dueDate: e.target.value }))}
-                    />
-                  </FormControl>
-                )}
               </Grid>
 
               {/* Numéro et Titre */}
