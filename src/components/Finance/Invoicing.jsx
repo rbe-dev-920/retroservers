@@ -427,101 +427,86 @@ const FinanceInvoicing = () => {
       // Sauvegarder le document avec l'HTML généré
       setDocForm(prev => ({ ...prev, htmlContent: generatedHtml }));
 
-      // Générer le PDF
-      const element = document.createElement("div");
-      element.innerHTML = generatedHtml;
-      element.style.padding = "20px";
+      console.log("📄 Envoi au serveur pour génération PDF avec Puppeteer...");
 
-      const opt = {
-        margin: 10,
-        filename: `${docForm.type === "QUOTE" ? "Devis" : "Facture"}_${docForm.number}.pdf`,
-        image: { type: "jpeg", quality: 0.98 },
-        html2canvas: { scale: 2 },
-        jsPDF: { orientation: "portrait", unit: "mm", format: "a4" }
-      };
-
-      // Générer PDF
-      try {
-        const pdfDataUri = await html2pdf().set(opt).from(element).output("datauristring");
-        
-        // Sauvegarder le PDF généré dans la base de données
-        if (editingDocument?.id) {
-          try {
-            const token = localStorage.getItem("token");
-            await fetch(
-              (import.meta.env.VITE_API_URL || "http://localhost:4000") + `/api/finance/documents/${editingDocument.id}/save-pdf`,
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${token}`
-                },
-                body: JSON.stringify({ pdfDataUri, htmlContent: generatedHtml })
-              }
-            );
-          } catch (e) {
-            console.warn("⚠️ Impossible de sauvegarder le PDF:", e.message);
-          }
+      // Appeler l'endpoint serveur pour générer le PDF
+      const token = localStorage.getItem("token");
+      const generateResponse = await fetch(
+        (import.meta.env.VITE_API_URL || "http://localhost:4000") + `/api/finance/documents/${editingDocument.id}/generate-pdf`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ htmlContent: generatedHtml })
         }
+      );
 
-        // Ouvrir aperçu dans une nouvelle fenêtre
-        const newWindow = window.open("", "_blank");
-        if (newWindow) {
-          newWindow.document.write(`
-            <html>
-              <head>
-                <title>Aperçu - ${docForm.type === "QUOTE" ? "Devis" : "Facture"} ${docForm.number}</title>
-                <style>
-                  body { margin: 0; padding: 10px; font-family: Arial, sans-serif; }
-                  #pdfContainer { width: 100%; height: 90vh; }
-                  #downloadBtn { 
-                    padding: 10px 20px; 
-                    background: #4CAF50; 
-                    color: white; 
-                    border: none; 
-                    border-radius: 4px; 
-                    cursor: pointer; 
-                    font-size: 16px;
-                    margin-bottom: 10px;
-                  }
-                  #downloadBtn:hover { background: #45a049; }
-                </style>
-              </head>
-              <body>
-                <button id="downloadBtn" onclick="downloadPDF()">⬇️ Télécharger PDF</button>
-                <iframe id="pdfContainer" src="${pdfDataUri}" type="application/pdf"></iframe>
-                <script>
-                  function downloadPDF() {
-                    const link = document.createElement('a');
-                    link.href = "${pdfDataUri}";
-                    link.download = "${docForm.type === "QUOTE" ? "Devis" : "Facture"}_${docForm.number}.pdf";
-                    link.click();
-                  }
-                </script>
-              </body>
-            </html>
-          `);
-          newWindow.document.close();
-        }
-
-        toast({
-          title: "Succès",
-          description: "PDF généré ! Aperçu et téléchargement disponibles.",
-          status: "success"
-        });
-      } catch (error) {
-        console.error("❌ Erreur génération PDF:", error);
-        toast({
-          title: "Erreur",
-          description: "Impossible de générer le PDF: " + error.message,
-          status: "error"
-        });
+      if (!generateResponse.ok) {
+        const error = await generateResponse.json();
+        throw new Error(error.error || "Erreur lors de la génération du PDF");
       }
+
+      const generateResult = await generateResponse.json();
+      const pdfDataUri = generateResult.pdfDataUri;
+
+      if (!pdfDataUri) {
+        throw new Error("Impossible de générer le PDF - résultat vide du serveur");
+      }
+
+      console.log("✅ PDF généré avec succès par Puppeteer!");
+
+      // Ouvrir aperçu dans une nouvelle fenêtre
+      const newWindow = window.open("", "_blank");
+      if (newWindow) {
+        newWindow.document.write(`
+          <html>
+            <head>
+              <title>Aperçu - ${docForm.type === "QUOTE" ? "Devis" : "Facture"} ${docForm.number}</title>
+              <style>
+                body { margin: 0; padding: 10px; font-family: Arial, sans-serif; }
+                #pdfContainer { width: 100%; height: 90vh; }
+                #downloadBtn { 
+                  padding: 10px 20px; 
+                  background: #4CAF50; 
+                  color: white; 
+                  border: none; 
+                  border-radius: 4px; 
+                  cursor: pointer; 
+                  font-size: 16px;
+                  margin-bottom: 10px;
+                }
+                #downloadBtn:hover { background: #45a049; }
+              </style>
+            </head>
+            <body>
+              <button id="downloadBtn" onclick="downloadPDF()">⬇️ Télécharger PDF</button>
+              <iframe id="pdfContainer" src="${pdfDataUri}" type="application/pdf"></iframe>
+              <script>
+                function downloadPDF() {
+                  const link = document.createElement('a');
+                  link.href = "${pdfDataUri}";
+                  link.download = "${docForm.type === "QUOTE" ? "Devis" : "Facture"}_${docForm.number}.pdf";
+                  link.click();
+                }
+              </script>
+            </body>
+          </html>
+        `);
+        newWindow.document.close();
+      }
+
+      toast({
+        title: "Succès",
+        description: "PDF généré par serveur ! Aperçu et téléchargement disponibles.",
+        status: "success"
+      });
     } catch (error) {
-      console.error("❌ Erreur globale génération:", error);
+      console.error("❌ Erreur génération PDF:", error);
       toast({
         title: "Erreur",
-        description: "Impossible de générer le document",
+        description: "Impossible de générer le PDF: " + error.message,
         status: "error"
       });
     }
