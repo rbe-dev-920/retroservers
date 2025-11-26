@@ -1166,6 +1166,24 @@ const FinanceInvoicing = () => {
                   </Select>
                 </FormControl>
                 <FormControl>
+                  <FormLabel fontWeight="bold" fontSize="sm">Template</FormLabel>
+                  <Select
+                    value={selectedTemplate?.id || ""}
+                    size="sm"
+                    onChange={(e) => {
+                      const tmpl = templates.find(t => t.id === e.target.value);
+                      setSelectedTemplate(tmpl || null);
+                    }}
+                  >
+                    <option value="">-- Sélectionner un template --</option>
+                    {templates.map(template => (
+                      <option key={template.id} value={template.id}>
+                        {template.name}
+                      </option>
+                    ))}
+                  </Select>
+                </FormControl>
+                <FormControl>
                   <FormLabel fontWeight="bold" fontSize="sm">Date</FormLabel>
                   <Input
                     type="date"

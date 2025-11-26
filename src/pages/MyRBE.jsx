@@ -95,16 +95,6 @@ const cards = [
     cardAccess: true
   },
   {
-    title: "RétroPlanning",
-    description: "Calendrier centralisé: campagnes, tournées, affectations",
-    to: "/dashboard/retroplanning",
-    icon: FiCalendar,
-    color: "orange",
-    resource: "PLANNING",
-    cardAccess: true,
-    hidden: true // Temporairement masqué - en cours de correction de la modale
-  },
-  {
     title: "Gestion du Site",
     description: "Changelog, contenu et mise à jour",
     to: "/dashboard/site-management",
