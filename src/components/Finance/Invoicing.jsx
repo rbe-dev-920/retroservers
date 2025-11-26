@@ -469,100 +469,23 @@ const FinanceInvoicing = () => {
     console.log(`📄 Ouverture du PDF pour: ${doc.number}`);
     
     try {
-      // Essayer d'abord la génération depuis le template Word (.dotx)
-      await generatePDFFromWord(doc);
-    } catch (error) {
-      console.error("❌ Erreur génération Word-to-PDF, retour à la méthode HTML:", error);
-      // Fallback: utiliser la génération HTML classique
-      try {
-        if (!doc.htmlContent && (!selectedTemplate || !templates.length)) {
-          toast({
-            title: "Attention",
-            description: "Aucun contenu HTML pour ce document. Générez-le d'abord.",
-            status: "warning"
-          });
-          return;
-        }
-
-        await regeneratePDF(doc);
-      } catch (fallbackError) {
-        console.error("❌ Erreur fallback:", fallbackError);
+      if (!doc.htmlContent && (!selectedTemplate || !templates.length)) {
         toast({
-          title: "Erreur",
-          description: "Impossible d'ouvrir le PDF",
-          status: "error"
+          title: "Attention",
+          description: "Aucun contenu HTML pour ce document. Générez-le d'abord.",
+          status: "warning"
         });
-      }
-    }
-  };
-
-  // Générer PDF depuis le template Word
-  const generatePDFFromWord = async (doc) => {
-    try {
-      toast({
-        title: "Génération en cours...",
-        description: "Génération du PDF depuis le template Word...",
-        status: "info"
-      });
-
-      const token = localStorage.getItem("token");
-      const apiUrl = (import.meta.env.VITE_API_URL || "http://localhost:4000").replace(/\/$/, '');
-      const endpoint = `${apiUrl}/api/finance/documents/${doc.id}/generate-pdf-from-word`;
-      
-      console.log(`🔗 POST ${endpoint}`);
-
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
-        }
-      });
-
-      console.log(`📊 Réponse status: ${response.status}`);
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Erreur lors de la génération du PDF");
+        return;
       }
 
-      const result = await response.json();
-      console.log("📋 Réponse serveur:", result);
-      
-      const pdfDataUri = result.pdfDataUri;
-
-      if (!pdfDataUri) {
-        throw new Error("Impossible de générer le PDF - résultat vide du serveur");
-      }
-
-      console.log(`✅ PDF reçu du serveur: ${pdfDataUri.length} caractères`);
-
-      // Afficher le PDF dans une fenêtre
-      const pdfWindow = window.open();
-      pdfWindow.document.write(`
-        <html>
-          <head>
-            <title>PDF - ${doc.number}</title>
-            <style>
-              body { margin: 0; padding: 0; }
-              iframe { width: 100vw; height: 100vh; border: none; }
-            </style>
-          </head>
-          <body>
-            <iframe src="${pdfDataUri}"></iframe>
-          </body>
-        </html>
-      `);
-      pdfWindow.document.close();
-
-      toast({
-        title: "Succès",
-        description: "PDF généré avec succès depuis le template Word",
-        status: "success"
-      });
+      await regeneratePDF(doc);
     } catch (error) {
-      console.error("❌ Erreur génération Word-to-PDF:", error);
-      throw error;
+      console.error("❌ Erreur ouverture PDF:", error);
+      toast({
+        title: "Erreur",
+        description: "Impossible d'ouvrir le PDF",
+        status: "error"
+      });
     }
   };
 
@@ -867,10 +790,10 @@ const FinanceInvoicing = () => {
         status: "info"
       });
 
-      // Utiliser le nouvel endpoint Word-to-PDF
+      // Régénérer le PDF pour obtenir une pdfDataUri valide
       const token = localStorage.getItem("token");
       const apiUrl = (import.meta.env.VITE_API_URL || "http://localhost:4000").replace(/\/$/, '');
-      const endpoint = `${apiUrl}/api/finance/documents/${doc.id}/generate-pdf-from-word`;
+      const endpoint = `${apiUrl}/api/finance/documents/${doc.id}/generate-pdf`;
       
       console.log(`🔗 POST ${endpoint}`);
 
@@ -879,7 +802,8 @@ const FinanceInvoicing = () => {
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`
-        }
+        },
+        body: JSON.stringify({ htmlContent: doc.htmlContent || "" })
       });
 
       if (!generateResponse.ok) {
@@ -889,14 +813,13 @@ const FinanceInvoicing = () => {
 
       const generateResult = await generateResponse.json();
       const pdfDataUri = generateResult.pdfDataUri;
-      const filename = generateResult.filename || `${doc.type === 'QUOTE' ? 'Devis' : 'Facture'}_${doc.number}.pdf`;
 
       if (!pdfDataUri) {
         throw new Error("Impossible de générer le PDF");
       }
 
-      // Télécharger le PDF
-      downloadPDFOnly(pdfDataUri, filename);
+      // Télécharger le PDF valide
+      downloadPDFOnly(pdfDataUri, `${doc.type === 'QUOTE' ? 'Devis' : 'Facture'}_${doc.number}.pdf`);
 
       toast({
         title: "Succès",
