@@ -163,17 +163,15 @@ export const calculateFinancialStats = (transactions = [], scheduledOps = []) =>
 };
 
 /**
- * Calcule le montant TTC à partir du HT et TVA
+ * Calcule le montant TTC (Association = pas de TVA)
  */
 export const calculateTTC = (amountExcludingTax, taxRate = 0) => {
   const ht = parseFloat(amountExcludingTax) || 0;
-  const rate = parseFloat(taxRate) || 0;
-  const taxAmount = ht * (rate / 100);
-  const ttc = ht + taxAmount;
+  // Association = pas de TVA, le montant HT = TTC
   
   return {
-    taxAmount: parseFloat(taxAmount.toFixed(2)),
-    totalAmount: parseFloat(ttc.toFixed(2))
+    taxAmount: 0,
+    totalAmount: parseFloat(ht.toFixed(2))
   };
 };
 
