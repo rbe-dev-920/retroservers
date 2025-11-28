@@ -15,7 +15,7 @@ import {
   NumberDecrementStepper, Tabs, TabList, TabPanels, Tab, TabPanel,
   Divider, useBreakpointValue, Grid, Wrap, WrapItem, IconButton
 } from "@chakra-ui/react";
-import { FiDownload, FiEye, FiPlus, FiEdit2, FiTrash2, FiPrinter, FiUpload, FiInfo } from "react-icons/fi";
+import { FiDownload, FiEye, FiPlus, FiEdit2, FiTrash2, FiPrinter, FiUpload, FiInfo, FiChevronDown } from "react-icons/fi";
 import html2pdf from "html2pdf.js";
 import { useFinanceData } from "../../hooks/useFinanceData";
 import DevisLinesManager from "../DevisLinesManager";
@@ -59,6 +59,8 @@ const FinanceInvoicing = () => {
     amountPaid: "",
     htmlContent: ""
   });
+
+  const [expandedRows, setExpandedRows] = useState({}); // Track des lignes ouvertes
 
   const toast = useToast();
   const { isOpen, onOpen, onClose } = useDisclosure();
@@ -1191,14 +1193,11 @@ const FinanceInvoicing = () => {
                     <Table size={{ base: "sm", md: "md" }} variant="striped">
                       <Thead>
                         <Tr bg="gray.50">
+                          <Th w="10">🔻</Th>
                           <Th>N°</Th>
                           <Th>Titre</Th>
-                          <Th display={{ base: "none", md: "table-cell" }}>Date</Th>
                           <Th isNumeric>Montant</Th>
-                          <Th isNumeric display={{ base: "none", sm: "table-cell" }}>Payé</Th>
-                          <Th isNumeric display={{ base: "none", sm: "table-cell" }} color="red.600">Reste</Th>
-                          <Th display={{ base: "none", sm: "table-cell" }}>Paiement</Th>
-                          <Th display={{ base: "none", sm: "table-cell" }}>Statut</Th>
+                          <Th isNumeric>Payé</Th>
                           <Th>Actions</Th>
                         </Tr>
                       </Thead>
@@ -1207,86 +1206,188 @@ const FinanceInvoicing = () => {
                           const total = parseFloat(doc.amount || 0);
                           const paid = parseFloat(doc.amountPaid || 0);
                           const remaining = Math.max(0, total - paid);
+                          const isExpanded = expandedRows[doc.id];
                           
                           return (
-                            <Tr key={doc.id}>
-                              <Td fontWeight="bold" fontSize={{ base: "xs", md: "md" }}>
-                                {doc.number}
-                              </Td>
-                              <Td fontSize={{ base: "xs", md: "md" }}>
-                                {doc.title.substring(0, 20)}
-                              </Td>
-                              <Td display={{ base: "none", md: "table-cell" }} fontSize="sm">
-                                {new Date(doc.date).toLocaleDateString('fr-FR')}
-                              </Td>
-                              <Td isNumeric fontWeight="bold" fontSize={{ base: "xs", md: "md" }}>
-                                {total.toFixed(2)} €
-                              </Td>
-                              <Td isNumeric display={{ base: "none", sm: "table-cell" }} fontWeight="bold" color={paid > 0 ? "green.600" : "gray.500"} fontSize={{ base: "xs", md: "md" }}>
-                                {paid.toFixed(2)} €
-                              </Td>
-                              <Td isNumeric display={{ base: "none", sm: "table-cell" }} fontWeight="bold" color={remaining > 0 ? "red.600" : "green.600"} fontSize={{ base: "xs", md: "md" }}>
-                                {remaining.toFixed(2)} €
-                              </Td>
-                              <Td display={{ base: "none", sm: "table-cell" }} fontSize="xs">
-                                {doc.paymentMethod ? doc.paymentMethod : "-"}
-                              </Td>
-                              <Td display={{ base: "none", sm: "table-cell" }}>
-                                <Badge colorScheme={statusColors[doc.status]} fontSize="xs">
-                                  {statusLabels[doc.status]}
-                                </Badge>
-                              </Td>
-                              <Td>
-                                <HStack spacing={1}>
+                            <React.Fragment key={doc.id}>
+                              {/* Ligne principale - Courte */}
+                              <Tr>
+                                <Td cursor="pointer" p={1}>
                                   <IconButton
-                                    size={{ base: "xs", md: "sm" }}
-                                    icon={<FiEye />}
-                                    variant="ghost"
-                                    colorScheme="blue"
-                                    onClick={() => handleViewPDF(doc)}
-                                    title="Visualiser PDF"
-                                  />
-                                  <IconButton
-                                    size={{ base: "xs", md: "sm" }}
-                                    icon={<FiDownload />}
-                                    variant="ghost"
-                                    colorScheme="green"
-                                    onClick={() => handleDownloadPDF(doc)}
-                                    title="Télécharger PDF"
-                                  />
-                                  <Select
                                     size="xs"
-                                    width="auto"
-                                    value={doc.status}
-                                    onChange={(e) => handleChangeStatus(doc.id, e.target.value)}
-                                    cursor="pointer"
-                                    display={{ base: "none", sm: "block" }}
-                                  >
-                                    {invoiceStatuses.map(s => (
-                                      <option key={s} value={s}>{statusLabels[s]}</option>
-                                    ))}
-                                  </Select>
-                                  <IconButton
-                                    size={{ base: "xs", md: "sm" }}
-                                    icon={<FiEdit2 />}
+                                    icon={<FiChevronDown style={{ transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />}
                                     variant="ghost"
-                                    colorScheme="blue"
-                                    onClick={() => handleOpenEdit(doc)}
-                                    title="Modifier"
-                                    display={{ base: "none", sm: "block" }}
+                                    onClick={() => setExpandedRows(prev => ({ ...prev, [doc.id]: !prev[doc.id] }))}
                                   />
-                                  <IconButton
-                                    size={{ base: "xs", md: "sm" }}
-                                  icon={<FiTrash2 />}
-                                  variant="ghost"
-                                  colorScheme="red"
-                                  onClick={() => handleDelete(doc.id)}
-                                  title="Supprimer"
-                                  display={{ base: "none", md: "block" }}
-                                />
-                              </HStack>
-                            </Td>
-                          </Tr>
+                                </Td>
+                                <Td fontWeight="bold">{doc.number}</Td>
+                                <Td>{doc.title.substring(0, 25)}</Td>
+                                <Td isNumeric fontWeight="bold">{total.toFixed(2)} €</Td>
+                                <Td isNumeric fontWeight="bold" color={paid > 0 ? "green.600" : "gray.500"}>{paid.toFixed(2)} €</Td>
+                                <Td>
+                                  <HStack spacing={1}>
+                                    <IconButton
+                                      size="xs"
+                                      icon={<FiEye />}
+                                      variant="ghost"
+                                      colorScheme="blue"
+                                      onClick={() => handleViewPDF(doc)}
+                                      title="Visualiser PDF"
+                                    />
+                                    <IconButton
+                                      size="xs"
+                                      icon={<FiDownload />}
+                                      variant="ghost"
+                                      colorScheme="green"
+                                      onClick={() => handleDownloadPDF(doc)}
+                                      title="Télécharger PDF"
+                                    />
+                                    <IconButton
+                                      size="xs"
+                                      icon={<FiEdit2 />}
+                                      variant="ghost"
+                                      colorScheme="blue"
+                                      onClick={() => handleOpenEdit(doc)}
+                                      title="Modifier"
+                                    />
+                                    <IconButton
+                                      size="xs"
+                                      icon={<FiTrash2 />}
+                                      variant="ghost"
+                                      colorScheme="red"
+                                      onClick={() => handleDelete(doc.id)}
+                                      title="Supprimer"
+                                    />
+                                  </HStack>
+                                </Td>
+                              </Tr>
+
+                              {/* Ligne expandable - Historique des paiements */}
+                              {isExpanded && (
+                                <Tr bg="purple.50">
+                                  <Td colSpan={10} py={3}>
+                                    <VStack align="stretch" spacing={3}>
+                                      {/* Infos du paiement */}
+                                      <Box>
+                                        <Text fontWeight="bold" fontSize="sm" mb={2}>💰 Statut de paiement:</Text>
+                                        <HStack spacing={4}>
+                                          <VStack align="start" spacing={0}>
+                                            <Text fontSize="sm" color="gray.600">Total:</Text>
+                                            <Text fontSize="lg" fontWeight="bold" color="blue.600">{total.toFixed(2)} €</Text>
+                                          </VStack>
+                                          <VStack align="start" spacing={0}>
+                                            <Text fontSize="sm" color="gray.600">Payé:</Text>
+                                            <Text fontSize="lg" fontWeight="bold" color="green.600">{paid.toFixed(2)} €</Text>
+                                          </VStack>
+                                          <VStack align="start" spacing={0}>
+                                            <Text fontSize="sm" color="gray.600">Reste:</Text>
+                                            <Text fontSize="lg" fontWeight="bold" color={remaining > 0 ? "red.600" : "green.600"}>
+                                              {remaining.toFixed(2)} €
+                                            </Text>
+                                          </VStack>
+                                          <VStack align="start" spacing={0}>
+                                            <Text fontSize="sm" color="gray.600">Statut:</Text>
+                                            <Badge colorScheme={statusColors[doc.status]}>
+                                              {statusLabels[doc.status]}
+                                            </Badge>
+                                          </VStack>
+                                        </HStack>
+                                      </Box>
+
+                                      {/* Historique des paiements */}
+                                      <Box borderTop="1px solid" borderColor="purple.200" pt={2}>
+                                        <Text fontWeight="bold" fontSize="sm" mb={2}>📜 Historique des paiements:</Text>
+                                        {(() => {
+                                          try {
+                                            const history = typeof doc.paymentHistory === 'string' 
+                                              ? JSON.parse(doc.paymentHistory) 
+                                              : doc.paymentHistory || [];
+                                            
+                                            return history.length > 0 ? (
+                                              <VStack align="stretch" spacing={1}>
+                                                {history.map((payment, idx) => (
+                                                  <HStack 
+                                                    key={idx} 
+                                                    justify="space-between" 
+                                                    fontSize="sm" 
+                                                    p={2} 
+                                                    bg="white" 
+                                                    borderRadius="md"
+                                                    borderLeft="3px solid"
+                                                    borderColor="purple.400"
+                                                  >
+                                                    <VStack align="start" spacing={0}>
+                                                      <Text fontWeight="bold">{payment.method}</Text>
+                                                      <Text fontSize="xs" color="gray.600">
+                                                        {new Date(payment.date).toLocaleDateString('fr-FR')}
+                                                      </Text>
+                                                    </VStack>
+                                                    <Text fontWeight="bold" color="green.700" fontSize="md">
+                                                      +{parseFloat(payment.amount).toFixed(2)} €
+                                                    </Text>
+                                                  </HStack>
+                                                ))}
+                                              </VStack>
+                                            ) : (
+                                              <Text fontSize="sm" color="gray.500">Aucun paiement enregistré</Text>
+                                            );
+                                          } catch (e) {
+                                            return <Text fontSize="sm" color="red.500">Erreur affichage historique</Text>;
+                                          }
+                                        })()}
+                                      </Box>
+
+                                      {/* Formulaire d'ajout de paiement */}
+                                      {remaining > 0 && (
+                                        <Box borderTop="1px solid" borderColor="purple.200" pt={2} bg="blue.50" p={2} borderRadius="md">
+                                          <Text fontWeight="bold" fontSize="sm" mb={2}>➕ Ajouter un paiement:</Text>
+                                          <HStack spacing={2}>
+                                            <FormControl>
+                                              <FormLabel fontSize="xs">Mode</FormLabel>
+                                              <Input
+                                                size="sm"
+                                                placeholder="Virement..."
+                                                value={docForm.paymentMethod || ""}
+                                                onChange={(e) => setDocForm(prev => ({ ...prev, paymentMethod: e.target.value }))}
+                                              />
+                                            </FormControl>
+                                            <FormControl>
+                                              <FormLabel fontSize="xs">Date</FormLabel>
+                                              <Input
+                                                size="sm"
+                                                type="date"
+                                                value={docForm.paymentDate || ""}
+                                                onChange={(e) => setDocForm(prev => ({ ...prev, paymentDate: e.target.value }))}
+                                              />
+                                            </FormControl>
+                                            <FormControl>
+                                              <FormLabel fontSize="xs">Montant (€)</FormLabel>
+                                              <NumberInput
+                                                size="sm"
+                                                value={docForm.amountPaid || ""}
+                                                onChange={(v) => setDocForm(prev => ({ ...prev, amountPaid: v }))}
+                                                min={0}
+                                                max={remaining}
+                                              >
+                                                <NumberInputField />
+                                              </NumberInput>
+                                            </FormControl>
+                                            <Button
+                                              size="sm"
+                                              colorScheme="green"
+                                              onClick={() => handleOpenEdit(doc)}
+                                              mt={6}
+                                            >
+                                              Enregistrer
+                                            </Button>
+                                          </HStack>
+                                        </Box>
+                                      )}
+                                    </VStack>
+                                  </Td>
+                                </Tr>
+                              )}
+                            </React.Fragment>
                           );
                         })}
                       </Tbody>
