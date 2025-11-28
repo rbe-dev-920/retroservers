@@ -35,19 +35,6 @@ export const validateDocument = (doc) => {
   if (!doc.amount || doc.amount <= 0) errors.push("Montant doit être > 0");
   if (!doc.date) errors.push("Date requise");
 
-  // Validation TTC si HT fourni
-  if (doc.amountExcludingTax) {
-    const ht = parseFloat(doc.amountExcludingTax);
-    const tax = parseFloat(doc.taxRate || 0);
-    const expectedTTC = ht * (1 + tax / 100);
-    const actualTTC = parseFloat(doc.amount);
-    
-    // Vérifier que le TTC correspond à HT + TVA (tolérance 0.01€)
-    if (Math.abs(expectedTTC - actualTTC) > 0.01) {
-      errors.push("Le montant TTC ne correspond pas à HT + TVA");
-    }
-  }
-
   return {
     isValid: errors.length === 0,
     errors
