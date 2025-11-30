@@ -464,4 +464,4 @@ const ScheduledTab = () => {
   );
 };
 
-export default Schedul
+export default ScheduledTab;
