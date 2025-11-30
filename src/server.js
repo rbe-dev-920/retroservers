@@ -613,6 +613,26 @@ app.delete('/api/admin/users/:id/permissions/:permission', requireAuth, (req, re
   res.json({ permissions: user.permissions || [] });
 });
 
+// Promouvoir/Rétrograder un utilisateur en admin
+app.post('/api/admin/users/:id/make-admin', requireAuth, (req, res) => {
+  const { isAdmin } = req.body || {};
+  state.members = state.members.map(m => {
+    if (m.id === req.params.id) {
+      const perms = m.permissions || [];
+      if (isAdmin && !perms.includes('admin')) {
+        perms.push('admin');
+      } else if (!isAdmin) {
+        return { ...m, permissions: perms.filter(p => p !== 'admin') };
+      }
+      return { ...m, permissions: perms };
+    }
+    return m;
+  });
+  const user = state.members.find(m => m.id === req.params.id);
+  const role = (user.permissions && user.permissions.includes('admin')) ? 'ADMIN' : 'MEMBER';
+  res.json({ user: { ...user, role }, permissions: user.permissions || [] });
+});
+
 // EMAIL & QUOTE TEMPLATES
 app.get('/api/email-templates', requireAuth, (req, res) => {
   res.json({ templates: [] });
