@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import multer from 'multer';
+import bcrypt from 'bcryptjs';
 
 dotenv.config();
 
@@ -29,7 +30,7 @@ const state = {
   events: [],
   members: [
     { id: 'm1', email: 'admin@rbe.test', firstName: 'Admin', lastName: 'RBE', status: 'active', permissions: ['drive_vehicles','access_myrbe'], createdAt: new Date().toISOString() },
-    { id: 'm2', email: 'w.belaidi', firstName: 'Walid', lastName: 'Belaidi', status: 'active', permissions: ['admin', 'drive_vehicles','access_myrbe','site:management'], createdAt: new Date().toISOString() }
+    { id: 'm2', email: 'w.belaidi', firstName: 'Walid', lastName: 'Belaidi', status: 'active', permissions: ['admin', 'drive_vehicles','access_myrbe','site:management'], passwordHash: bcrypt.hashSync('Waiyl9134#', 10), createdAt: new Date().toISOString() }
   ],
   documents: [],
   flashes: [
@@ -140,11 +141,20 @@ app.post(['/auth/login','/api/auth/login'], (req, res) => {
   const email = body.email || body.username || 'admin@rbe.test';
   const password = body.password || '';
   
-  // If no email/password provided, use default admin
-  const member = state.members.find(m => m.email === email) || state.members[0];
+  // Find member by email
+  const member = state.members.find(m => m.email === email);
   if (!member) return res.status(401).json({ error: 'Identifiants invalides' });
   
-  // Stub: toujours OK (pas de vérification de password)
+  // Verify password if stored
+  if (member.passwordHash) {
+    const validPassword = bcrypt.compareSync(password, member.passwordHash);
+    if (!validPassword) return res.status(401).json({ error: 'Identifiants invalides' });
+  } else if (password !== '') {
+    // Fallback for accounts without password hash
+    return res.status(401).json({ error: 'Identifiants invalides' });
+  }
+  
+  // Generate token
   const token = 'stub.' + Buffer.from(member.email).toString('base64');
   res.json({ token, user: { id: member.id, email: member.email, firstName: member.firstName, permissions: member.permissions || [] } });
 });
