@@ -842,6 +842,13 @@ app.delete('/api/newsletter/:id', (req, res) => {
   res.json({ ok: true });
 });
 
+// USER PERMISSIONS (pour le frontend)
+app.get('/api/user-permissions/:userId', requireAuth, (req, res) => {
+  const user = state.members.find(m => m.id === req.params.userId);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  res.json({ permissions: user.permissions || [] });
+});
+
 // Generic error handler
 app.use((err, req, res, next) => {
   console.error('Unhandled error', err);
