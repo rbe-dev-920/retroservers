@@ -1,3 +1,0 @@
-[submodule "api"]
-	url = https://github.com/rbe-dev-920/retroservers.git
-	path = api
