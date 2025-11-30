@@ -53,6 +53,9 @@ const state = {
   ],
   vehicleServiceSchedule: [
     // { id, parc, serviceType, description, frequency, priority, status, plannedDate }
+  ],
+  retroRequests: [
+    { id: 'rr1', title: 'Demande 1', description: 'Description', status: 'open', createdAt: new Date().toISOString(), memberId: 'm1' }
   ]
 };
 
@@ -616,6 +619,50 @@ app.delete('/api/finance/scheduled-operations/:id', requireAuth, (req, res) => {
 
 app.get('/api/finance/documents', requireAuth, (req, res) => {
   res.json({ documents: state.documents });
+});
+
+// RETRO-REQUESTS (Rétro-demandes)
+app.get('/api/retro-requests', requireAuth, (req, res) => {
+  // Return user's own requests
+  const memberId = req.query.memberId || 'm1';
+  const requests = state.retroRequests.filter(r => r.memberId === memberId);
+  res.json({ requests });
+});
+
+app.get('/api/retro-requests/admin/all', requireAuth, (req, res) => {
+  // Return all requests for admin
+  res.json({ requests: state.retroRequests });
+});
+
+app.post('/api/retro-requests', requireAuth, (req, res) => {
+  const { title, description, memberId = 'm1' } = req.body || {};
+  const request = { 
+    id: uid(), 
+    title: title || 'Nouvelle demande',
+    description: description || '',
+    status: 'open',
+    createdAt: new Date().toISOString(),
+    memberId
+  };
+  state.retroRequests.push(request);
+  res.status(201).json({ request });
+});
+
+app.get('/api/retro-requests/:id', requireAuth, (req, res) => {
+  const request = state.retroRequests.find(r => r.id === req.params.id);
+  if (!request) return res.status(404).json({ error: 'Request not found' });
+  res.json({ request });
+});
+
+app.put('/api/retro-requests/:id', requireAuth, (req, res) => {
+  state.retroRequests = state.retroRequests.map(r => r.id === req.params.id ? { ...r, ...req.body } : r);
+  const request = state.retroRequests.find(r => r.id === req.params.id);
+  res.json({ request });
+});
+
+app.delete('/api/retro-requests/:id', requireAuth, (req, res) => {
+  state.retroRequests = state.retroRequests.filter(r => r.id !== req.params.id);
+  res.json({ ok: true });
 });
 
 // Generic error handler
