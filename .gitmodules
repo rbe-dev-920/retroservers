@@ -1,0 +1,3 @@
+[submodule "api"]
+	url = https://github.com/retrodev-essonne/retroservers.git
+	path = api
