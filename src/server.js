@@ -518,6 +518,106 @@ app.get('/api/quote-templates/:id', requireAuth, (req, res) => {
   res.status(404).json({ error: 'Template not found' });
 });
 
+// API prefix aliases for finance endpoints (legacy support)
+app.get('/api/finance/transactions', requireAuth, (req, res) => {
+  const { page = 1, limit = 20, eventId } = req.query;
+  let list = state.transactions;
+  if (eventId) list = list.filter(t => t.eventId === eventId);
+  const start = (Number(page)-1)*Number(limit);
+  const slice = list.slice(start, start + Number(limit));
+  res.json({ transactions: slice, total: list.length });
+});
+
+app.post('/api/finance/transactions', requireAuth, (req, res) => {
+  const tx = { id: uid(), date: today(), ...req.body };
+  state.transactions.unshift(tx);
+  if (tx.type === 'recette') state.bankBalance += Number(tx.amount||0); else state.bankBalance -= Number(tx.amount||0);
+  res.status(201).json(tx);
+});
+
+app.put('/api/finance/transactions/:id', requireAuth, (req, res) => {
+  state.transactions = state.transactions.map(t => t.id === req.params.id ? { ...t, ...req.body } : t);
+  const tx = state.transactions.find(t => t.id === req.params.id);
+  res.json(tx);
+});
+
+app.delete('/api/finance/transactions/:id', requireAuth, (req, res) => {
+  state.transactions = state.transactions.filter(t => t.id !== req.params.id);
+  res.json({ ok: true });
+});
+
+app.get('/api/finance/balance', requireAuth, (req, res) => {
+  res.json({ data: { balance: state.bankBalance } });
+});
+
+app.post('/api/finance/balance', requireAuth, (req, res) => {
+  state.bankBalance = Number(req.body.balance || 0);
+  res.json({ data: { balance: state.bankBalance } });
+});
+
+app.get('/api/finance/expense-reports', requireAuth, (req, res) => {
+  const { eventId } = req.query;
+  let list = state.expenseReports;
+  if (eventId) list = list.filter(r => r.eventId === eventId);
+  res.json({ reports: list });
+});
+
+app.post('/api/finance/expense-reports', requireAuth, upload.single('file'), (req, res) => {
+  const { date, description, amount, status = 'open', planned = false, eventId } = req.body;
+  const report = {
+    id: uid(),
+    date: date || today(),
+    description: description || '',
+    amount: Number(amount || 0),
+    status,
+    planned: planned === 'true' || planned === true,
+    fileName: req.file?.originalname,
+    fileUrl: req.file ? `/uploads/${req.file.filename}` : '',
+    eventId: eventId || null
+  };
+  state.expenseReports.unshift(report);
+  res.status(201).json({ report });
+});
+
+app.put('/api/finance/expense-reports/:id', requireAuth, (req, res) => {
+  state.expenseReports = state.expenseReports.map(r => r.id === req.params.id ? { ...r, ...req.body } : r);
+  const report = state.expenseReports.find(r => r.id === req.params.id);
+  res.json({ report });
+});
+
+app.delete('/api/finance/expense-reports/:id', requireAuth, (req, res) => {
+  state.expenseReports = state.expenseReports.filter(r => r.id !== req.params.id);
+  res.json({ ok: true });
+});
+
+app.get('/api/finance/scheduled-operations', requireAuth, (req, res) => {
+  const { eventId } = req.query;
+  let list = state.scheduled;
+  if (eventId) list = list.filter(x => x.eventId === eventId);
+  res.json({ operations: list });
+});
+
+app.post('/api/finance/scheduled-operations', requireAuth, (req, res) => {
+  const op = { id: uid(), ...req.body };
+  state.scheduled.push(op);
+  res.status(201).json(op);
+});
+
+app.put('/api/finance/scheduled-operations/:id', requireAuth, (req, res) => {
+  state.scheduled = state.scheduled.map(o => o.id === req.params.id ? { ...o, ...req.body } : o);
+  const op = state.scheduled.find(o => o.id === req.params.id);
+  res.json(op);
+});
+
+app.delete('/api/finance/scheduled-operations/:id', requireAuth, (req, res) => {
+  state.scheduled = state.scheduled.filter(o => o.id !== req.params.id);
+  res.json({ ok: true });
+});
+
+app.get('/api/finance/documents', requireAuth, (req, res) => {
+  res.json({ documents: state.documents });
+});
+
 // Generic error handler
 app.use((err, req, res, next) => {
   console.error('Unhandled error', err);
