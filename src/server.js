@@ -2,7 +2,6 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import multer from 'multer';
-import bcrypt from 'bcryptjs';
 
 dotenv.config();
 
@@ -30,7 +29,7 @@ const state = {
   events: [],
   members: [
     { id: 'm1', email: 'admin@rbe.test', firstName: 'Admin', lastName: 'RBE', status: 'active', permissions: ['drive_vehicles','access_myrbe'], createdAt: new Date().toISOString() },
-    { id: 'm2', email: 'w.belaidi', firstName: 'Waiyl', lastName: 'Belaidi', status: 'active', permissions: ['admin', 'drive_vehicles','access_myrbe','site:management'], passwordHash: bcrypt.hashSync('Waiyl9134#', 10), createdAt: new Date().toISOString() }
+    { id: 'm2', email: 'w.belaidi', firstName: 'Waiyl', lastName: 'Belaidi', status: 'active', permissions: ['admin', 'drive_vehicles','access_myrbe','site:management'], createdAt: new Date().toISOString() }
   ],
   documents: [],
   flashes: [
@@ -55,19 +54,7 @@ const state = {
   ],
   vehicleServiceSchedule: [
     // { id, parc, serviceType, description, frequency, priority, status, plannedDate }
-  ],
-  retroRequests: [
-    { id: 'rr1', title: 'Demande 1', description: 'Description', status: 'open', createdAt: new Date().toISOString(), memberId: 'm1' }
-  ],
-  stocks: [
-    { id: 's1', name: 'Pièce moteur', quantity: 5, category: 'motor', location: 'A1', unitPrice: 150 },
-    { id: 's2', name: 'Batterie', quantity: 3, category: 'electric', location: 'A2', unitPrice: 200 }
-  ],
-  newsletter: {
-    subscribers: [
-      { id: 'ns1', email: 'w.belaidi@example.com', status: 'subscribed', subscribedAt: new Date().toISOString() }
-    ]
-  }
+  ]
 };
 
 // Helpers
@@ -107,7 +94,7 @@ app.use(express.json());
 // Static files (serve uploaded content)
 app.use('/uploads', express.static(pathRoot + '/uploads'));
 
-// Auth placeholder
+// Auth middleware
 app.use((req, res, next) => {
   const auth = req.headers.authorization;
   if (auth && auth.startsWith('Bearer ')) {
@@ -118,7 +105,7 @@ app.use((req, res, next) => {
         const email = Buffer.from(token.substring(5), 'base64').toString();
         const member = state.members.find(m => m.email === email);
         if (member) {
-          req.user = { id: member.id, email: member.email, role: 'admin', ...member };
+          req.user = { id: member.id, email: member.email, ...member };
         } else {
           req.user = { id: 'user', role: 'admin', email };
         }
@@ -129,44 +116,32 @@ app.use((req, res, next) => {
       req.user = { id: 'user', role: 'admin' };
     }
   } else {
-    // Default user when no auth header (for public endpoints)
+    // Default guest user when no auth header
     req.user = { id: 'guest', role: 'guest', email: 'guest@retrobus' };
   }
   next();
 });
 
-// Auth system temporarily disabled - all endpoints are public
-const requireAuth = (req, res, next) => next();
+const requireAuth = (req, res, next) => {
+  if (!req.user || req.user.id === 'guest') return res.status(401).json({ error: 'Unauthorized' });
+  next();
+};
 
 // Health & version
 app.get(['/api/health','/health'], (req, res) => res.json({ ok: true, time: new Date().toISOString(), version: 'rebuild-1' }));
 
 // AUTH
 app.post(['/auth/login','/api/auth/login'], (req, res) => {
-  const body = req.body || {};
-  const email = body.email || body.username || 'admin@rbe.test';
-  const password = body.password || '';
-  
-  // Find member by email
-  const member = state.members.find(m => m.email === email);
+  const { email, password } = req.body || {};
+  if (!email || !password) return res.status(400).json({ error: 'email & password requis' });
+  const member = state.members.find(m => m.email === email) || state.members[0];
   if (!member) return res.status(401).json({ error: 'Identifiants invalides' });
-  
-  // Verify password if stored
-  if (member.passwordHash) {
-    const validPassword = bcrypt.compareSync(password, member.passwordHash);
-    if (!validPassword) return res.status(401).json({ error: 'Identifiants invalides' });
-  } else if (password !== '') {
-    // Fallback for accounts without password hash
-    return res.status(401).json({ error: 'Identifiants invalides' });
-  }
-  
-  // Generate token
-  const token = 'stub.' + Buffer.from(member.email).toString('base64');
+  // Stub: toujours OK
+  const token = 'stub.' + Buffer.from(email).toString('base64');
   const role = (member.permissions && member.permissions.includes('admin')) ? 'ADMIN' : 'MEMBER';
   res.json({ token, user: { id: member.id, email: member.email, firstName: member.firstName, permissions: member.permissions || [], role } });
 });
 app.get(['/auth/me','/api/auth/me','/api/me'], (req, res) => {
-  // Return the authenticated user with proper role detection
   let member = null;
   if (req.user && req.user.email && req.user.email !== 'guest@retrobus') {
     member = state.members.find(m => m.email === req.user.email);
@@ -175,16 +150,7 @@ app.get(['/auth/me','/api/auth/me','/api/me'], (req, res) => {
     return res.json({ user: null });
   }
   const role = (member.permissions && member.permissions.includes('admin')) ? 'ADMIN' : 'MEMBER';
-  res.json({ 
-    user: { 
-      id: member.id, 
-      email: member.email, 
-      firstName: member.firstName, 
-      lastName: member.lastName, 
-      permissions: member.permissions || [], 
-      role 
-    } 
-  });
+  res.json({ user: { id: member.id, email: member.email, firstName: member.firstName, lastName: member.lastName, permissions: member.permissions || [], role } });
 });
 
 // FLASHES
@@ -324,12 +290,9 @@ app.get(['/api/members','/members'], requireAuth, (req, res) => {
   return res.json({ members: state.members.slice(0, limit) });
 });
 app.get(['/api/members/me'], requireAuth, (req, res) => {
-  // Return the logged-in user from token
-  const member = req.user && req.user.email 
-    ? state.members.find(m => m.email === req.user.email) || req.user
-    : (state.members[0] || null);
-  const role = (member && member.permissions && member.permissions.includes('admin')) ? 'ADMIN' : 'MEMBER';
-  return res.json({ member: member ? { ...member, role, passwordHash: undefined } : null });
+  // stub current member from token
+  const m = state.members[0] || null;
+  return res.json({ member: m });
 });
 app.post(['/api/members','/members'], requireAuth, (req, res) => {
   const member = { id: uid(), status: 'active', createdAt: new Date().toISOString(), ...req.body };
@@ -552,7 +515,7 @@ app.get('/finance/export', requireAuth, (req, res) => {
   res.send('Date,Type,Description,Montant\n');
 });
 
-// ADMIN endpoints
+// ADMIN USERS
 app.get('/api/admin/users', requireAuth, (req, res) => {
   res.json(state.members);
 });
@@ -574,46 +537,6 @@ app.delete('/api/admin/users/:id', requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
-app.get('/api/admin/users/:id/permissions', requireAuth, (req, res) => {
-  const user = state.members.find(m => m.id === req.params.id);
-  if (!user) return res.status(404).json({ error: 'User not found' });
-  res.json({ permissions: user.permissions || [] });
-});
-
-app.put('/api/admin/users/:id/permissions', requireAuth, (req, res) => {
-  const { permissions } = req.body || {};
-  state.members = state.members.map(m => m.id === req.params.id ? { ...m, permissions } : m);
-  const user = state.members.find(m => m.id === req.params.id);
-  res.json({ permissions: user.permissions || [] });
-});
-
-app.post('/api/admin/users/:id/permissions', requireAuth, (req, res) => {
-  const { permission } = req.body || {};
-  state.members = state.members.map(m => {
-    if (m.id === req.params.id) {
-      const perms = m.permissions || [];
-      if (!perms.includes(permission)) perms.push(permission);
-      return { ...m, permissions: perms };
-    }
-    return m;
-  });
-  const user = state.members.find(m => m.id === req.params.id);
-  res.json({ permissions: user.permissions || [] });
-});
-
-app.delete('/api/admin/users/:id/permissions/:permission', requireAuth, (req, res) => {
-  state.members = state.members.map(m => {
-    if (m.id === req.params.id) {
-      const perms = (m.permissions || []).filter(p => p !== req.params.permission);
-      return { ...m, permissions: perms };
-    }
-    return m;
-  });
-  const user = state.members.find(m => m.id === req.params.id);
-  res.json({ permissions: user.permissions || [] });
-});
-
-// Promouvoir/Rétrograder un utilisateur en admin
 app.post('/api/admin/users/:id/make-admin', requireAuth, (req, res) => {
   const { isAdmin } = req.body || {};
   state.members = state.members.map(m => {
@@ -633,269 +556,8 @@ app.post('/api/admin/users/:id/make-admin', requireAuth, (req, res) => {
   res.json({ user: { ...user, role }, permissions: user.permissions || [] });
 });
 
-// EMAIL & QUOTE TEMPLATES
-app.get('/api/email-templates', requireAuth, (req, res) => {
-  res.json({ templates: [] });
-});
-
-app.get('/api/email-templates/:id', requireAuth, (req, res) => {
-  res.status(404).json({ error: 'Template not found' });
-});
-
-app.get('/api/quote-templates', requireAuth, (req, res) => {
-  res.json({ templates: [] });
-});
-
-app.get('/api/quote-templates/:id', requireAuth, (req, res) => {
-  res.status(404).json({ error: 'Template not found' });
-});
-
-// API prefix aliases for finance endpoints (legacy support)
-app.get('/api/finance/transactions', requireAuth, (req, res) => {
-  const { page = 1, limit = 20, eventId } = req.query;
-  let list = state.transactions;
-  if (eventId) list = list.filter(t => t.eventId === eventId);
-  const start = (Number(page)-1)*Number(limit);
-  const slice = list.slice(start, start + Number(limit));
-  res.json({ transactions: slice, total: list.length });
-});
-
-app.post('/api/finance/transactions', requireAuth, (req, res) => {
-  const tx = { id: uid(), date: today(), ...req.body };
-  state.transactions.unshift(tx);
-  if (tx.type === 'recette') state.bankBalance += Number(tx.amount||0); else state.bankBalance -= Number(tx.amount||0);
-  res.status(201).json(tx);
-});
-
-app.put('/api/finance/transactions/:id', requireAuth, (req, res) => {
-  state.transactions = state.transactions.map(t => t.id === req.params.id ? { ...t, ...req.body } : t);
-  const tx = state.transactions.find(t => t.id === req.params.id);
-  res.json(tx);
-});
-
-app.delete('/api/finance/transactions/:id', requireAuth, (req, res) => {
-  state.transactions = state.transactions.filter(t => t.id !== req.params.id);
-  res.json({ ok: true });
-});
-
-app.get('/api/finance/balance', requireAuth, (req, res) => {
-  res.json({ data: { balance: state.bankBalance } });
-});
-
-app.post('/api/finance/balance', requireAuth, (req, res) => {
-  state.bankBalance = Number(req.body.balance || 0);
-  res.json({ data: { balance: state.bankBalance } });
-});
-
-app.get('/api/finance/expense-reports', requireAuth, (req, res) => {
-  const { eventId } = req.query;
-  let list = state.expenseReports;
-  if (eventId) list = list.filter(r => r.eventId === eventId);
-  res.json({ reports: list });
-});
-
-app.post('/api/finance/expense-reports', requireAuth, upload.single('file'), (req, res) => {
-  const { date, description, amount, status = 'open', planned = false, eventId } = req.body;
-  const report = {
-    id: uid(),
-    date: date || today(),
-    description: description || '',
-    amount: Number(amount || 0),
-    status,
-    planned: planned === 'true' || planned === true,
-    fileName: req.file?.originalname,
-    fileUrl: req.file ? `/uploads/${req.file.filename}` : '',
-    eventId: eventId || null
-  };
-  state.expenseReports.unshift(report);
-  res.status(201).json({ report });
-});
-
-app.put('/api/finance/expense-reports/:id', requireAuth, (req, res) => {
-  state.expenseReports = state.expenseReports.map(r => r.id === req.params.id ? { ...r, ...req.body } : r);
-  const report = state.expenseReports.find(r => r.id === req.params.id);
-  res.json({ report });
-});
-
-app.delete('/api/finance/expense-reports/:id', requireAuth, (req, res) => {
-  state.expenseReports = state.expenseReports.filter(r => r.id !== req.params.id);
-  res.json({ ok: true });
-});
-
-app.get('/api/finance/scheduled-operations', requireAuth, (req, res) => {
-  const { eventId } = req.query;
-  let list = state.scheduled;
-  if (eventId) list = list.filter(x => x.eventId === eventId);
-  res.json({ operations: list });
-});
-
-app.post('/api/finance/scheduled-operations', requireAuth, (req, res) => {
-  const op = { id: uid(), ...req.body };
-  state.scheduled.push(op);
-  res.status(201).json(op);
-});
-
-app.put('/api/finance/scheduled-operations/:id', requireAuth, (req, res) => {
-  state.scheduled = state.scheduled.map(o => o.id === req.params.id ? { ...o, ...req.body } : o);
-  const op = state.scheduled.find(o => o.id === req.params.id);
-  res.json(op);
-});
-
-app.delete('/api/finance/scheduled-operations/:id', requireAuth, (req, res) => {
-  state.scheduled = state.scheduled.filter(o => o.id !== req.params.id);
-  res.json({ ok: true });
-});
-
-app.get('/api/finance/documents', requireAuth, (req, res) => {
-  res.json({ documents: state.documents });
-});
-
-// RETRO-REQUESTS (Rétro-demandes)
-app.get('/api/retro-requests', requireAuth, (req, res) => {
-  // Return user's own requests
-  const memberId = req.query.memberId || 'm1';
-  const requests = state.retroRequests.filter(r => r.memberId === memberId);
-  res.json({ requests });
-});
-
-app.get('/api/retro-requests/admin/all', requireAuth, (req, res) => {
-  // Return all requests for admin
-  res.json({ requests: state.retroRequests });
-});
-
-app.post('/api/retro-requests', requireAuth, (req, res) => {
-  const { title, description, memberId = 'm1' } = req.body || {};
-  const request = { 
-    id: uid(), 
-    title: title || 'Nouvelle demande',
-    description: description || '',
-    status: 'open',
-    createdAt: new Date().toISOString(),
-    memberId
-  };
-  state.retroRequests.push(request);
-  res.status(201).json({ request });
-});
-
-app.get('/api/retro-requests/:id', requireAuth, (req, res) => {
-  const request = state.retroRequests.find(r => r.id === req.params.id);
-  if (!request) return res.status(404).json({ error: 'Request not found' });
-  res.json({ request });
-});
-
-app.put('/api/retro-requests/:id', requireAuth, (req, res) => {
-  state.retroRequests = state.retroRequests.map(r => r.id === req.params.id ? { ...r, ...req.body } : r);
-  const request = state.retroRequests.find(r => r.id === req.params.id);
-  res.json({ request });
-});
-
-app.delete('/api/retro-requests/:id', requireAuth, (req, res) => {
-  state.retroRequests = state.retroRequests.filter(r => r.id !== req.params.id);
-  res.json({ ok: true });
-});
-
-// STOCKS (Gestion de stock)
-app.get('/api/stocks', requireAuth, (req, res) => {
-  const { category, location } = req.query;
-  let list = state.stocks;
-  if (category) list = list.filter(s => s.category === category);
-  if (location) list = list.filter(s => s.location === location);
-  res.json({ stocks: list });
-});
-
-app.get('/api/stocks/stats', requireAuth, (req, res) => {
-  const totalItems = state.stocks.reduce((sum, s) => sum + s.quantity, 0);
-  const totalValue = state.stocks.reduce((sum, s) => sum + (s.quantity * s.unitPrice), 0);
-  const categories = [...new Set(state.stocks.map(s => s.category))];
-  res.json({ 
-    stats: { 
-      totalItems, 
-      totalValue, 
-      categoryCount: categories.length,
-      lowStock: state.stocks.filter(s => s.quantity < 5).length
-    } 
-  });
-});
-
-app.post('/api/stocks', requireAuth, (req, res) => {
-  const { name, quantity, category, location, unitPrice } = req.body || {};
-  const stock = { 
-    id: uid(),
-    name: name || 'Stock',
-    quantity: Number(quantity || 0),
-    category: category || 'other',
-    location: location || '',
-    unitPrice: Number(unitPrice || 0)
-  };
-  state.stocks.push(stock);
-  res.status(201).json({ stock });
-});
-
-app.get('/api/stocks/:id', requireAuth, (req, res) => {
-  const stock = state.stocks.find(s => s.id === req.params.id);
-  if (!stock) return res.status(404).json({ error: 'Stock not found' });
-  res.json({ stock });
-});
-
-app.put('/api/stocks/:id', requireAuth, (req, res) => {
-  state.stocks = state.stocks.map(s => s.id === req.params.id ? { ...s, ...req.body } : s);
-  const stock = state.stocks.find(s => s.id === req.params.id);
-  res.json({ stock });
-});
-
-app.delete('/api/stocks/:id', requireAuth, (req, res) => {
-  state.stocks = state.stocks.filter(s => s.id !== req.params.id);
-  res.json({ ok: true });
-});
-
-// NEWSLETTER
-app.get('/newsletter', (req, res) => {
-  res.json(state.newsletter.subscribers);
-});
-
-app.get('/api/newsletter', (req, res) => {
-  res.json(state.newsletter.subscribers);
-});
-
-app.post('/newsletter', (req, res) => {
-  const { email } = req.body || {};
-  if (!email) return res.status(400).json({ error: 'Email required' });
-  const subscriber = { 
-    id: 'ns' + uid().slice(0, 8),
-    email,
-    status: 'subscribed',
-    subscribedAt: new Date().toISOString()
-  };
-  state.newsletter.subscribers.push(subscriber);
-  res.status(201).json({ subscriber });
-});
-
-app.post('/api/newsletter', (req, res) => {
-  const { email } = req.body || {};
-  if (!email) return res.status(400).json({ error: 'Email required' });
-  const subscriber = { 
-    id: 'ns' + uid().slice(0, 8),
-    email,
-    status: 'subscribed',
-    subscribedAt: new Date().toISOString()
-  };
-  state.newsletter.subscribers.push(subscriber);
-  res.status(201).json({ subscriber });
-});
-
-app.delete('/newsletter/:id', (req, res) => {
-  state.newsletter.subscribers = state.newsletter.subscribers.filter(s => s.id !== req.params.id);
-  res.json({ ok: true });
-});
-
-app.delete('/api/newsletter/:id', (req, res) => {
-  state.newsletter.subscribers = state.newsletter.subscribers.filter(s => s.id !== req.params.id);
-  res.json({ ok: true });
-});
-
-// USER PERMISSIONS (pour le frontend)
-app.get('/api/user-permissions/:userId', requireAuth, (req, res) => {
-  const user = state.members.find(m => m.id === req.params.userId);
+app.get('/api/admin/users/:id/permissions', requireAuth, (req, res) => {
+  const user = state.members.find(m => m.id === req.params.id);
   if (!user) return res.status(404).json({ error: 'User not found' });
   res.json({ permissions: user.permissions || [] });
 });
