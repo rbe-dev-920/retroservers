@@ -37,7 +37,7 @@ const state = {
     { id: 'f2', title: 'Nouvelle page', message: 'Photothèque RBE', active: false, createdAt: new Date().toISOString() }
   ],
   retroNews: [
-    { id: 'rn1', title: 'Bienvenue sur RétroBus', body: 'Plateforme reconstruite.', publishedAt: new Date().toISOString() }
+    { id: 'rn1', title: 'Bienvenue sur RétroBus', body: 'Plateforme reconstruite.', content: 'Plateforme reconstruite.', published: true, featured: true, publishedAt: new Date().toISOString() }
   ],
   notifications: [
     { id: 'n1', type: 'info', message: 'Serveur API reconstruit', createdAt: new Date().toISOString(), read: false }
