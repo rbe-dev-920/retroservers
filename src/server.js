@@ -800,11 +800,11 @@ app.delete('/api/stocks/:id', requireAuth, (req, res) => {
 
 // NEWSLETTER
 app.get('/newsletter', (req, res) => {
-  res.json({ subscribers: state.newsletter.subscribers });
+  res.json(state.newsletter.subscribers);
 });
 
 app.get('/api/newsletter', (req, res) => {
-  res.json({ subscribers: state.newsletter.subscribers });
+  res.json(state.newsletter.subscribers);
 });
 
 app.post('/newsletter', (req, res) => {
