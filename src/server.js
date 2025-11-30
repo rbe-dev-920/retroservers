@@ -128,6 +128,9 @@ app.use((req, res, next) => {
     } else {
       req.user = { id: 'user', role: 'admin' };
     }
+  } else {
+    // Default user when no auth header (for public endpoints)
+    req.user = { id: 'guest', role: 'guest', email: 'guest@retrobus' };
   }
   next();
 });
@@ -161,13 +164,26 @@ app.post(['/auth/login','/api/auth/login'], (req, res) => {
   const token = 'stub.' + Buffer.from(member.email).toString('base64');
   res.json({ token, user: { id: member.id, email: member.email, firstName: member.firstName, permissions: member.permissions || [] } });
 });
-app.get(['/auth/me','/api/auth/me','/api/me'], requireAuth, (req, res) => {
-  // Return the logged-in user from token
-  const member = req.user && req.user.email 
-    ? state.members.find(m => m.email === req.user.email) || req.user
-    : (state.members[0] || null);
+app.get(['/auth/me','/api/auth/me','/api/me'], (req, res) => {
+  // Return the authenticated user with proper role detection
+  let member = null;
+  if (req.user && req.user.email && req.user.email !== 'guest@retrobus') {
+    member = state.members.find(m => m.email === req.user.email);
+  }
+  if (!member) {
+    return res.json({ user: null });
+  }
   const role = (member.permissions && member.permissions.includes('admin')) ? 'ADMIN' : 'MEMBER';
-  res.json({ user: member ? { id: member.id, email: member.email, firstName: member.firstName, lastName: member.lastName, permissions: member.permissions || [], role } : null });
+  res.json({ 
+    user: { 
+      id: member.id, 
+      email: member.email, 
+      firstName: member.firstName, 
+      lastName: member.lastName, 
+      permissions: member.permissions || [], 
+      role 
+    } 
+  });
 });
 
 // FLASHES
