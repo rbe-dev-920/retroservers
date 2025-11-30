@@ -15,4 +15,4 @@ COPY . .
 RUN mkdir -p uploads
 
 # Démarre le serveur
-CMD ["node", "src/index.js"]
+CMD ["node", "src/server.js"]

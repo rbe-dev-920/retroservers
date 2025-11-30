@@ -1,0 +1,90 @@
+// Prisma schema minimal reconstruit à partir des besoins frontend
+// NOTE: stockage initial en mémoire; migrations futures nécessaires.
+// Datasource & generator placeholders (adapter plus tard à PostgreSQL)
+
+datasource db {
+  provider = "sqlite" // bascule vers postgresql quand prêt
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Member {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  firstName     String?
+  lastName      String?
+  status        String   @default("active")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  documents     Document[]
+  expenseReports ExpenseReport[]
+}
+
+model Document {
+  id         String   @id @default(cuid())
+  member     Member   @relation(fields: [memberId], references: [id])
+  memberId   String
+  type       String
+  status     String   @default("valid")
+  expiresAt  DateTime?
+  createdAt  DateTime @default(now())
+}
+
+model Event {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  date        DateTime?
+  status      String   @default("draft")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  transactions Transaction[]
+  scheduled    ScheduledExpense[]
+  expenseReports ExpenseReport[]
+}
+
+model Transaction {
+  id          String   @id @default(cuid())
+  type        String   // recette | depense
+  amount      Float    @default(0)
+  description String?
+  category    String?
+  date        DateTime @default(now())
+  event       Event?   @relation(fields: [eventId], references: [id])
+  eventId     String?
+  createdAt   DateTime @default(now())
+}
+
+model ScheduledExpense {
+  id          String   @id @default(cuid())
+  type        String   // recette | depense
+  amount      Float    @default(0)
+  description String?
+  category    String?
+  dueDate     DateTime?
+  recurring   String?  // none | monthly | yearly
+  event       Event?   @relation(fields: [eventId], references: [id])
+  eventId     String?
+  createdAt   DateTime @default(now())
+}
+
+model ExpenseReport {
+  id          String   @id @default(cuid())
+  date        DateTime @default(now())
+  description String?
+  amount      Float    @default(0)
+  status      String   @default("open") // open | closed | reimbursed
+  planned     Boolean  @default(false)
+  fileName    String?
+  fileUrl     String?
+  member      Member?  @relation(fields: [memberId], references: [id])
+  memberId    String?
+  event       Event?   @relation(fields: [eventId], references: [id])
+  eventId     String?
+  createdAt   DateTime @default(now())
+  reimbursedAt DateTime?
+  closedAt    DateTime?
+}
