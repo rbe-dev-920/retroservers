@@ -112,12 +112,16 @@ app.get(['/api/health','/health'], (req, res) => res.json({ ok: true, time: new 
 
 // AUTH
 app.post(['/auth/login','/api/auth/login'], (req, res) => {
-  const { email, password } = req.body || {};
-  if (!email || !password) return res.status(400).json({ error: 'email & password requis' });
+  const body = req.body || {};
+  const email = body.email || body.username || 'admin@rbe.test';
+  const password = body.password || '';
+  
+  // If no email/password provided, use default admin
   const member = state.members.find(m => m.email === email) || state.members[0];
   if (!member) return res.status(401).json({ error: 'Identifiants invalides' });
-  // Stub: toujours OK
-  const token = 'stub.' + Buffer.from(email).toString('base64');
+  
+  // Stub: toujours OK (pas de vérification de password)
+  const token = 'stub.' + Buffer.from(member.email).toString('base64');
   res.json({ token, user: { id: member.id, email: member.email, firstName: member.firstName, permissions: member.permissions || [] } });
 });
 app.get(['/auth/me','/api/auth/me'], requireAuth, (req, res) => {
@@ -473,6 +477,45 @@ app.delete('/finance/expense-reports/:id', requireAuth, (req, res) => {
 app.get('/finance/export', requireAuth, (req, res) => {
   res.header('Content-Type','text/csv');
   res.send('Date,Type,Description,Montant\n');
+});
+
+// ADMIN endpoints
+app.get('/api/admin/users', requireAuth, (req, res) => {
+  res.json({ users: state.members });
+});
+
+app.get('/api/admin/users/:id', requireAuth, (req, res) => {
+  const user = state.members.find(m => m.id === req.params.id);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  res.json({ user });
+});
+
+app.put('/api/admin/users/:id', requireAuth, (req, res) => {
+  state.members = state.members.map(m => m.id === req.params.id ? { ...m, ...req.body } : m);
+  const user = state.members.find(m => m.id === req.params.id);
+  res.json({ user });
+});
+
+app.delete('/api/admin/users/:id', requireAuth, (req, res) => {
+  state.members = state.members.filter(m => m.id !== req.params.id);
+  res.json({ ok: true });
+});
+
+// EMAIL & QUOTE TEMPLATES
+app.get('/api/email-templates', requireAuth, (req, res) => {
+  res.json({ templates: [] });
+});
+
+app.get('/api/email-templates/:id', requireAuth, (req, res) => {
+  res.status(404).json({ error: 'Template not found' });
+});
+
+app.get('/api/quote-templates', requireAuth, (req, res) => {
+  res.json({ templates: [] });
+});
+
+app.get('/api/quote-templates/:id', requireAuth, (req, res) => {
+  res.status(404).json({ error: 'Template not found' });
 });
 
 // Generic error handler
