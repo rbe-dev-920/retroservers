@@ -19,6 +19,7 @@ import { FiDownload, FiEye, FiPlus, FiEdit2, FiTrash2, FiPrinter, FiUpload, FiIn
 import html2pdf from "html2pdf.js";
 import { useFinanceData } from "../../hooks/useFinanceData";
 import DevisLinesManager from "../DevisLinesManager";
+import ScheduledTab from "./ScheduledTab";
 
 const FinanceInvoicing = () => {
   const {
@@ -1183,6 +1184,9 @@ const FinanceInvoicing = () => {
           <Tab>
             💰 Factures ({invoices.length})
           </Tab>
+          <Tab>
+            ⏰ Échéanciers
+          </Tab>
         </TabList>
 
         <TabPanels>
@@ -1519,6 +1523,11 @@ const FinanceInvoicing = () => {
                 </Card>
               </Box>
             )}
+          </TabPanel>
+
+          {/* Onglet Échéanciers */}
+          <TabPanel>
+            <ScheduledTab />
           </TabPanel>
         </TabPanels>
       </Tabs>
