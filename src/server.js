@@ -29,8 +29,8 @@ const state = {
   expenseReports: [],
   events: [],
   members: [
-    { id: 'm1', email: 'admin@rbe.test', firstName: 'Admin', lastName: 'RBE', status: 'active', permissions: ['drive_vehicles','access_myrbe'], createdAt: new Date().toISOString() },
-    { id: 'm2', email: 'w.belaidi', firstName: 'Waiyl', lastName: 'Belaidi', status: 'active', permissions: ['admin', 'drive_vehicles','access_myrbe','site:management'], createdAt: new Date().toISOString() }
+    { id: 'm1', email: 'admin@rbe.test', firstName: 'Admin', lastName: 'RBE', status: 'active', permissions: ['ADMIN','drive_vehicles','access_myrbe','site:management'], createdAt: new Date().toISOString() },
+    { id: 'm2', email: 'w.belaidi', firstName: 'Waiyl', lastName: 'Belaidi', status: 'active', permissions: ['ADMIN', 'drive_vehicles','access_myrbe','site:management'], createdAt: new Date().toISOString() }
   ],
   documents: [],
   flashes: [
@@ -149,7 +149,7 @@ app.post(['/auth/login','/api/auth/login'], (req, res) => {
   if (!member) return res.status(401).json({ error: 'Identifiants invalides' });
   // Stub: toujours OK
   const token = 'stub.' + Buffer.from(email).toString('base64');
-  const role = (member.permissions && member.permissions.includes('admin')) ? 'ADMIN' : 'MEMBER';
+  const role = (member.permissions && member.permissions.includes('ADMIN')) ? 'ADMIN' : 'MEMBER';
   res.json({ token, user: { id: member.id, email: member.email, firstName: member.firstName, permissions: member.permissions || [], role } });
 });
 app.get(['/auth/me','/api/auth/me','/api/me'], (req, res) => {
@@ -160,7 +160,7 @@ app.get(['/auth/me','/api/auth/me','/api/me'], (req, res) => {
   if (!member) {
     return res.json({ user: null });
   }
-  const role = (member.permissions && member.permissions.includes('admin')) ? 'ADMIN' : 'MEMBER';
+  const role = (member.permissions && member.permissions.includes('ADMIN')) ? 'ADMIN' : 'MEMBER';
   res.json({ user: { id: member.id, email: member.email, firstName: member.firstName, lastName: member.lastName, permissions: member.permissions || [], role } });
 });
 
@@ -595,20 +595,28 @@ app.delete('/api/admin/users/:id', requireAuth, (req, res) => {
 
 app.post('/api/admin/users/:id/make-admin', requireAuth, (req, res) => {
   const { isAdmin } = req.body || {};
+  const ADMIN_PERMISSIONS = ['ADMIN', 'drive_vehicles', 'access_myrbe', 'site:management'];
+  
   state.members = state.members.map(m => {
     if (m.id === req.params.id) {
       const perms = m.permissions || [];
-      if (isAdmin && !perms.includes('admin')) {
-        perms.push('admin');
-      } else if (!isAdmin) {
-        return { ...m, permissions: perms.filter(p => p !== 'admin') };
+      if (isAdmin) {
+        // Ajouter TOUTES les permissions admin
+        ADMIN_PERMISSIONS.forEach(perm => {
+          if (!perms.includes(perm)) {
+            perms.push(perm);
+          }
+        });
+      } else {
+        // Retirer les permissions admin
+        return { ...m, permissions: perms.filter(p => !ADMIN_PERMISSIONS.includes(p)) };
       }
       return { ...m, permissions: perms };
     }
     return m;
   });
   const user = state.members.find(m => m.id === req.params.id);
-  const role = (user.permissions && user.permissions.includes('admin')) ? 'ADMIN' : 'MEMBER';
+  const role = (user.permissions && user.permissions.includes('ADMIN')) ? 'ADMIN' : 'MEMBER';
   res.json({ user: { ...user, role }, permissions: user.permissions || [] });
 });
 
