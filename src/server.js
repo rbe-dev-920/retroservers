@@ -802,6 +802,192 @@ app.get(['/vehicles/:parc/reports','/api/vehicles/:parc/reports'], requireAuth, 
   res.json({ reports: state.expenseReports.filter(r => r.parc === req.params.parc || !r.parc) });
 });
 
+// ============ ADMINISTRATION VÉHICULES ============
+
+// CARTES GRISES
+app.get(['/vehicles/:parc/cg','/api/vehicles/:parc/cg'], requireAuth, (req, res) => {
+  const parc = req.params.parc;
+  const cg = state.vehicleCarteGrise.find(c => c.parc === parc);
+  res.json(cg || { parc, oldCGPath: null, newCGPath: null, oldCGBarred: false, dateImport: null, notes: '' });
+});
+
+app.post(['/vehicles/:parc/cg','/api/vehicles/:parc/cg'], requireAuth, (req, res) => {
+  const parc = req.params.parc;
+  const { type, documentPath, notes } = req.body; // type: 'old' | 'new'
+  let cg = state.vehicleCarteGrise.find(c => c.parc === parc);
+  
+  if (!cg) {
+    cg = { id: uid(), parc, oldCGPath: null, newCGPath: null, oldCGBarred: false, dateImport: new Date().toISOString(), notes: notes || '' };
+    state.vehicleCarteGrise.push(cg);
+  }
+  
+  if (type === 'old') {
+    cg.oldCGPath = documentPath;
+  } else if (type === 'new') {
+    cg.newCGPath = documentPath;
+    cg.dateImport = new Date().toISOString();
+  }
+  
+  cg.notes = notes || cg.notes;
+  res.json(cg);
+});
+
+app.put(['/vehicles/:parc/cg/mark-old-barred','/api/vehicles/:parc/cg/mark-old-barred'], requireAuth, (req, res) => {
+  const parc = req.params.parc;
+  const cg = state.vehicleCarteGrise.find(c => c.parc === parc);
+  if (!cg) return res.status(404).json({ error: 'CG not found' });
+  cg.oldCGBarred = true;
+  res.json(cg);
+});
+
+// ASSURANCE
+app.get(['/vehicles/:parc/assurance','/api/vehicles/:parc/assurance'], requireAuth, (req, res) => {
+  const parc = req.params.parc;
+  const assurance = state.vehicleAssurance.find(a => a.parc === parc);
+  if (!assurance) return res.json({ parc, attestationPath: null, dateValidityStart: null, dateValidityEnd: null, timeValidityStart: null, timeValidityEnd: null, isActive: false, notes: '' });
+  
+  const now = new Date();
+  const endDate = assurance.dateValidityEnd ? new Date(assurance.dateValidityEnd) : null;
+  assurance.isActive = endDate ? endDate > now : false;
+  
+  res.json(assurance);
+});
+
+app.post(['/vehicles/:parc/assurance','/api/vehicles/:parc/assurance'], requireAuth, (req, res) => {
+  const parc = req.params.parc;
+  const { attestationPath, dateValidityStart, dateValidityEnd, timeValidityStart, timeValidityEnd, notes } = req.body;
+  
+  let assurance = state.vehicleAssurance.find(a => a.parc === parc);
+  if (!assurance) {
+    assurance = { id: uid(), parc, attestationPath: null, dateValidityStart: null, dateValidityEnd: null, timeValidityStart: null, timeValidityEnd: null, isActive: false, notes: '' };
+    state.vehicleAssurance.push(assurance);
+  }
+  
+  assurance.attestationPath = attestationPath || assurance.attestationPath;
+  assurance.dateValidityStart = dateValidityStart || assurance.dateValidityStart;
+  assurance.dateValidityEnd = dateValidityEnd || assurance.dateValidityEnd;
+  assurance.timeValidityStart = timeValidityStart || assurance.timeValidityStart;
+  assurance.timeValidityEnd = timeValidityEnd || assurance.timeValidityEnd;
+  assurance.notes = notes !== undefined ? notes : assurance.notes;
+  
+  const now = new Date();
+  const endDate = assurance.dateValidityEnd ? new Date(assurance.dateValidityEnd) : null;
+  assurance.isActive = endDate ? endDate > now : false;
+  
+  res.json(assurance);
+});
+
+// CONTRÔLE TECHNIQUE
+app.get(['/vehicles/:parc/ct','/api/vehicles/:parc/ct'], requireAuth, (req, res) => {
+  const parc = req.params.parc;
+  const cts = state.vehicleControleTechnique.filter(c => c.parc === parc).sort((a, b) => new Date(b.ctDate) - new Date(a.ctDate));
+  const latest = cts[0];
+  
+  if (!latest) return res.json({ parc, ctHistory: [], latestCT: null });
+  
+  res.json({ parc, ctHistory: cts, latestCT: latest });
+});
+
+app.post(['/vehicles/:parc/ct','/api/vehicles/:parc/ct'], requireAuth, (req, res) => {
+  const parc = req.params.parc;
+  const { attestationPath, ctDate, ctStatus, nextCtDate, mileage, notes } = req.body;
+  
+  const ct = {
+    id: uid(),
+    parc,
+    attestationPath,
+    ctDate: ctDate || new Date().toISOString(),
+    ctStatus: ctStatus || 'passed', // 'passed' | 'contre-visite' | 'failed'
+    nextCtDate: nextCtDate || null,
+    mileage: mileage || null,
+    notes: notes || ''
+  };
+  
+  state.vehicleControleTechnique.push(ct);
+  res.status(201).json(ct);
+});
+
+// CERTIFICAT DE CESSION (une seule fois)
+app.get(['/vehicles/:parc/certificat-cession','/api/vehicles/:parc/certificat-cession'], requireAuth, (req, res) => {
+  const parc = req.params.parc;
+  const cert = state.vehicleCertificatCession.find(c => c.parc === parc);
+  res.json(cert || { parc, certificatPath: null, dateImport: null, notes: '', imported: false });
+});
+
+app.post(['/vehicles/:parc/certificat-cession','/api/vehicles/:parc/certificat-cession'], requireAuth, (req, res) => {
+  const parc = req.params.parc;
+  
+  // Vérifier si déjà importé
+  const existing = state.vehicleCertificatCession.find(c => c.parc === parc);
+  if (existing && existing.imported) {
+    return res.status(400).json({ error: 'Certificate already imported for this vehicle' });
+  }
+  
+  const { certificatPath, notes } = req.body;
+  let cert = existing || { id: uid(), parc };
+  
+  cert.certificatPath = certificatPath;
+  cert.dateImport = new Date().toISOString();
+  cert.notes = notes || '';
+  cert.imported = true;
+  
+  if (!existing) state.vehicleCertificatCession.push(cert);
+  
+  res.json(cert);
+});
+
+// ÉCHÉANCIER
+app.get(['/vehicles/:parc/echancier','/api/vehicles/:parc/echancier'], requireAuth, (req, res) => {
+  const parc = req.params.parc;
+  const items = state.vehicleEchancier.filter(e => e.parc === parc).sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
+  res.json(items);
+});
+
+app.get(['/api/echancier','/echancier'], requireAuth, (req, res) => {
+  const allItems = state.vehicleEchancier.sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
+  res.json({ echancier: allItems });
+});
+
+app.post(['/vehicles/:parc/echancier','/api/vehicles/:parc/echancier'], requireAuth, (req, res) => {
+  const parc = req.params.parc;
+  const { type, description, dueDate, notes } = req.body;
+  
+  const item = {
+    id: uid(),
+    parc,
+    type: type || 'assurance', // 'assurance' | 'ct' | 'cg'
+    description: description || '',
+    dueDate,
+    status: 'pending', // 'pending' | 'done' | 'expired'
+    notes: notes || ''
+  };
+  
+  state.vehicleEchancier.push(item);
+  res.status(201).json(item);
+});
+
+app.put(['/vehicles/:parc/echancier/:id','/api/vehicles/:parc/echancier/:id'], requireAuth, (req, res) => {
+  const { parc, id } = req.params;
+  const { status, notes } = req.body;
+  
+  const item = state.vehicleEchancier.find(e => e.id === id && e.parc === parc);
+  if (!item) return res.status(404).json({ error: 'Item not found' });
+  
+  if (status) item.status = status;
+  if (notes !== undefined) item.notes = notes;
+  
+  res.json(item);
+});
+
+app.delete(['/vehicles/:parc/echancier/:id','/api/vehicles/:parc/echancier/:id'], requireAuth, (req, res) => {
+  const { parc, id } = req.params;
+  const idx = state.vehicleEchancier.findIndex(e => e.id === id && e.parc === parc);
+  if (idx === -1) return res.status(404).json({ error: 'Item not found' });
+  
+  const deleted = state.vehicleEchancier.splice(idx, 1)[0];
+  res.json(deleted);
+});
+
 // RETRO REQUESTS & NEWS (RetroAssistant, RétroDemandes)
 app.get(['/api/retro-requests'], requireAuth, (req, res) => {
   // Map RetroNews to retro-requests format
