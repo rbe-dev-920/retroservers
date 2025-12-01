@@ -257,6 +257,61 @@ app.get('/api/me', requireAuth, (req, res) => {
   });
 });
 
+// PUBLIC ENDPOINTS (no authentication required)
+app.get('/site-config', (req, res) => {
+  res.json({
+    siteName: 'RétroBus Essonne',
+    siteURL: 'https://association-rbe.fr',
+    apiURL: 'https://attractive-kindness-rbe-serveurs.up.railway.app',
+    logo: '/assets/logo.png',
+    description: 'Association RétroBus Essonne - Patrimoine automobile et mobilité douce'
+  });
+});
+
+// Public events endpoint
+app.get('/public/events', (req, res) => {
+  const publicEvents = state.events.filter(e => e.status === 'PUBLISHED').map(e => ({
+    id: e.id,
+    title: e.title,
+    description: e.description,
+    date: e.date,
+    status: e.status,
+    createdAt: e.createdAt
+  }));
+  res.json(publicEvents);
+});
+
+app.get('/public/events/:id', (req, res) => {
+  const event = state.events.find(e => e.id === req.params.id && e.status === 'PUBLISHED');
+  if (!event) return res.status(404).json({ error: 'Event not found' });
+  res.json(event);
+});
+
+// Public vehicles endpoint
+app.get('/public/vehicles', (req, res) => {
+  const publicVehicles = state.vehicles.map(v => ({
+    id: v.id || v.parc,
+    parc: v.parc,
+    marque: v.marque,
+    modele: v.modele,
+    etat: v.etat,
+    fuel: v.fuel,
+    caracteristiques: v.caracteristiques
+  }));
+  res.json(publicVehicles);
+});
+
+app.get('/public/vehicles/:id', (req, res) => {
+  const vehicle = state.vehicles.find(v => v.id === req.params.id || v.parc === req.params.id);
+  if (!vehicle) return res.status(404).json({ error: 'Vehicle not found' });
+  res.json(vehicle);
+});
+
+app.get('/public/vehicles/:id/events', (req, res) => {
+  // Return empty array for now - would need to link vehicles to events
+  res.json([]);
+});
+
 // FLASHES
 app.get(['/flashes','/api/flashes'], (req, res) => {
   res.json(state.flashes.filter(f => f.active));
