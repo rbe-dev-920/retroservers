@@ -390,6 +390,17 @@ async function initializeFromBackup() {
       console.log(`   📅 ${state.vehicleServiceSchedule.length} services programmés restaurés`);
     }
     
+    // Load site_users for memberId → site_users ID mapping
+    if (backupData.tables.site_users?.data) {
+      state.siteUsers = backupData.tables.site_users.data.map(u => ({
+        id: u.id,
+        linkedMemberId: u.linkedMemberId,
+        email: u.email,
+        role: u.role
+      }));
+      console.log(`   👤 ${state.siteUsers.length} utilisateurs site chargés`);
+    }
+    
     // ✅ Marquer l'import comme terminé
     postgresDataImported = true;
     console.log('✅ Initialisation depuis backup terminée - données verrouillées en mémoire');
