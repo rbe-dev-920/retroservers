@@ -615,6 +615,12 @@ app.post(['/api/notifications/:id/read','/notifications/:id/read'], requireAuth,
 app.get(['/vehicles','/api/vehicles'], requireAuth, (req, res) => {
   res.json({ vehicles: state.vehicles });
 });
+app.get(['/vehicles/:parc','/api/vehicles/:parc'], requireAuth, (req, res) => {
+  const { parc } = req.params;
+  const v = state.vehicles.find(v => v.parc === parc);
+  if (!v) return res.status(404).json({ error: 'Vehicle not found' });
+  res.json({ vehicle: v });
+});
 app.put(['/vehicles/:parc','/api/vehicles/:parc'], requireAuth, (req, res) => {
   const { parc } = req.params;
   state.vehicles = state.vehicles.map(v => (v.parc === parc ? { ...v, ...req.body } : v));
@@ -958,25 +964,25 @@ app.get('/api/documents/:id/download', requireAuth, (req, res) => {
 });
 
 // EVENTS
-app.get('/events', requireAuth, (req, res) => {
+app.get(['/events', '/api/events'], requireAuth, (req, res) => {
   res.json({ events: state.events });
 });
-app.get('/events/:id', requireAuth, (req, res) => {
+app.get(['/events/:id', '/api/events/:id'], requireAuth, (req, res) => {
   const ev = state.events.find(e => e.id === req.params.id);
   if (!ev) return res.status(404).json({ error: 'Not found' });
   res.json({ event: ev });
 });
-app.post('/events', requireAuth, (req, res) => {
+app.post(['/events', '/api/events'], requireAuth, (req, res) => {
   const ev = { id: uid(), status: 'draft', createdAt: today(), ...req.body };
   state.events.push(ev);
   res.status(201).json({ event: ev });
 });
-app.put('/events/:id', requireAuth, (req, res) => {
+app.put(['/events/:id', '/api/events/:id'], requireAuth, (req, res) => {
   state.events = state.events.map(e => e.id === req.params.id ? { ...e, ...req.body } : e);
   const ev = state.events.find(e => e.id === req.params.id);
   res.json({ event: ev });
 });
-app.delete('/events/:id', requireAuth, (req, res) => {
+app.delete(['/events/:id', '/api/events/:id'], requireAuth, (req, res) => {
   state.events = state.events.filter(e => e.id !== req.params.id);
   res.json({ ok: true });
 });
