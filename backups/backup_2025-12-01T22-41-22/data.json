@@ -1,5 +1,5 @@
 {
-  "timestamp": "2025-12-01T22:54:57.934Z",
+  "timestamp": "2025-12-01T22:56:14.213Z",
   "description": "Sauvegarde automatique des données en mémoire",
   "tables": {
     "members": {
@@ -8,15 +8,15 @@
         {
           "id": "cmi6m56ex00015c2kkcgm0pcf",
           "email": "belaidiw91@gmail.com",
-          "firstName": "WaiylModifi�",
-          "lastName": "BelaiDiTest",
-          "status": "ACTIVE",
+          "firstName": "WAIYL",
+          "lastName": "BELAIDI",
+          "status": "active",
           "permissions": [
             "view_dashboard",
             "view_vehicles"
           ],
           "createdAt": "2025-11-19T22:08:02.362Z",
-          "updatedAt": "2025-12-01T22:54:57.428Z"
+          "updatedAt": "2025-12-01T22:56:13.703Z"
         }
       ]
     },
