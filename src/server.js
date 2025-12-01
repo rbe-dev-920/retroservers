@@ -455,7 +455,7 @@ app.get(['/public/events/:id'], (req, res) => {
 
 // EVENTS - Protected endpoints (auth required)
 app.get('/events', requireAuth, (req, res) => {
-  res.json({ events: state.events });
+  res.json(state.events);
 });
 app.get('/events/:id', requireAuth, (req, res) => {
   const ev = state.events.find(e => e.id === req.params.id);
