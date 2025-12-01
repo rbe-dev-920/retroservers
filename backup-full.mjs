@@ -22,33 +22,41 @@ const c = new Client({
   database: 'railway'
 });
 
-// Tables critiques à sauvegarder
+// ✅ TABLES À SAUVEGARDER - correspondant aux structures utilisées dans server.js
+// Ne sauvegarder que ce qu'on utilise réellement
 const tablesToBackup = [
-  'members',
-  'Vehicle',
-  'Event',
-  'finance_transactions',
-  'finance_categories',
-  'finance_balances',
-  'finance_expense_reports',
-  'user_permissions',
-  'RetroNews',
-  'Flash',
-  'Document',
-  'vehicle_maintenance',
-  'vehicle_service_schedule',
-  'site_users',
-  'notification_preferences',
-  'scheduled_operations',
-  'scheduled_operation_payments',
-  'Stock',
-  'StockMovement',
-  'Usage',
-  'Report',
-  'Changelog',
-  'DevisLine',       // Lignes de devis
-  'QuoteTemplate',   // Templates de devis
-  'financial_documents'  // Documents financiers
+  // Core data
+  'members',              // Utilisateurs/membres
+  'Vehicle',              // Véhicules
+  'Event',                // Événements
+  'site_users',           // Utilisateurs site (pour auth + permissions)
+  
+  // Finance
+  'finance_transactions', // Transactions
+  'finance_categories',   // Catégories financières
+  'finance_balances',     // Soldes/balance
+  'finance_expense_reports',  // Rapports de dépenses
+  
+  // Vehicles details
+  'vehicle_maintenance',  // Maintenance véhicules
+  'vehicle_service_schedule',  // Planning services
+  'Usage',                // Utilisation véhicules
+  
+  // Content
+  'RetroNews',            // Actualités RétroBus
+  'Flash',                // Messages flash
+  'Document',             // Documents
+  
+  // Financial documents
+  'DevisLine',            // Lignes de devis
+  'QuoteTemplate',        // Templates de devis
+  'financial_documents',  // Documents financiers
+  
+  // Permissions & settings
+  'user_permissions',     // Permissions utilisateurs
+  'notification_preferences',  // Préférences notifications
+  'scheduled_operations', // Opérations planifiées
+  'scheduled_operation_payments'  // Paiements planifiés
 ];
 
 async function backupDatabase() {
@@ -65,14 +73,18 @@ async function backupDatabase() {
     
     const backupData = {
       timestamp: new Date().toISOString(),
+      description: 'Export des tables critiques pour l\'application RétroBus',
       tables: {}
     };
     
     let totalRows = 0;
+    let successCount = 0;
+    let failureCount = 0;
+    
+    console.log('📥 EXPORT DES TABLES CRITIQUES\n');
     
     for (const table of tablesToBackup) {
       try {
-        console.log(`📥 Sauvegarde de ${table}...`);
         const res = await c.query(`SELECT * FROM "${table}"`);
         
         backupData.tables[table] = {
@@ -82,9 +94,17 @@ async function backupDatabase() {
         };
         
         totalRows += res.rows.length;
-        console.log(`   ✅ ${res.rows.length} lignes`);
+        successCount++;
+        
+        if (res.rows.length > 0) {
+          console.log(`  ✅ ${table.padEnd(35)} ${res.rows.length.toString().padStart(6)} lignes`);
+        } else {
+          console.log(`  ⚪ ${table.padEnd(35)} (vide)`);
+        }
       } catch (err) {
-        console.log(`   ⚠️  Erreur: ${err.message}`);
+        failureCount++;
+        const errMsg = err.message.includes('relation') ? 'table inexistante' : err.message.slice(0, 35);
+        console.log(`  ⚠️  ${table.padEnd(35)} ${errMsg}`);
       }
     }
     
@@ -92,13 +112,21 @@ async function backupDatabase() {
     const jsonPath = path.join(backupPath, 'data.json');
     fs.writeFileSync(jsonPath, JSON.stringify(backupData, null, 2));
     
-    // Créer un fichier manifest
+    // Créer un fichier manifest détaillé
     const manifest = {
       name: backupName,
       timestamp: new Date().toISOString(),
-      totalRows,
-      totalTables: Object.keys(backupData.tables).length,
-      tablesBackedup: Object.keys(backupData.tables)
+      type: 'FULL_EXPORT',
+      description: 'Export complet des tables critiques pour restauration autonome',
+      statistics: {
+        totalRows,
+        tablesRequested: tablesToBackup.length,
+        tablesExported: successCount,
+        tablesFailed: failureCount,
+        exportRate: ((successCount / tablesToBackup.length) * 100).toFixed(1) + '%'
+      },
+      tablesIncluded: Object.keys(backupData.tables),
+      usage: 'Ce backup contient TOUTES les données nécessaires pour démarrer l\'application sans dépendre de PostgreSQL'
     };
     
     const manifestPath = path.join(backupPath, 'manifest.json');
@@ -115,10 +143,23 @@ async function backupDatabase() {
     index.push(manifest);
     fs.writeFileSync(indexPath, JSON.stringify(index, null, 2));
     
-    console.log(`\n✅ Sauvegarde complète réussie!`);
-    console.log(`   📁 Dossier: ${backupPath}`);
-    console.log(`   📊 Total: ${totalRows} lignes sauvegardées`);
-    console.log(`   📋 Tables: ${Object.keys(backupData.tables).length}`);
+    console.log(`\n${'═'.repeat(75)}`);
+    console.log(`✅ EXPORT COMPLET RÉUSSI`);
+    console.log(`${'═'.repeat(75)}`);
+    console.log(`📁 Backup: ${backupPath}`);
+    console.log(`\n📊 Statistiques:`);
+    console.log(`   • Tables à exporter: ${tablesToBackup.length}`);
+    console.log(`   • Tables exportées: ${successCount}`);
+    console.log(`   • Tables manquantes: ${failureCount}`);
+    console.log(`   • Total de lignes: ${totalRows}`);
+    console.log(`   • Taux de réussite: ${((successCount / tablesToBackup.length) * 100).toFixed(1)}%`);
+    console.log(`\n📋 Fichiers créés:`);
+    console.log(`   • data.json (données)`);
+    console.log(`   • manifest.json (métadonnées)`);
+    console.log(`\n💡 Usage:`);
+    console.log(`   Ce backup contient TOUTES les données nécessaires pour démarrer`);
+    console.log(`   l'application sans dépendre de PostgreSQL.`);
+    console.log(`${'═'.repeat(75)}\n`);
     
   } catch (err) {
     console.error('❌ Erreur lors de la sauvegarde:', err.message);

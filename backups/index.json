@@ -61,5 +61,42 @@
       "QuoteTemplate",
       "financial_documents"
     ]
+  },
+  {
+    "name": "backup_2025-12-01T22-36-16",
+    "timestamp": "2025-12-01T22:36:17.312Z",
+    "type": "FULL_EXPORT",
+    "description": "Export complet des tables critiques pour restauration autonome",
+    "statistics": {
+      "totalRows": 49,
+      "tablesRequested": 21,
+      "tablesExported": 21,
+      "tablesFailed": 0,
+      "exportRate": "100.0%"
+    },
+    "tablesIncluded": [
+      "members",
+      "Vehicle",
+      "Event",
+      "site_users",
+      "finance_transactions",
+      "finance_categories",
+      "finance_balances",
+      "finance_expense_reports",
+      "vehicle_maintenance",
+      "vehicle_service_schedule",
+      "Usage",
+      "RetroNews",
+      "Flash",
+      "Document",
+      "DevisLine",
+      "QuoteTemplate",
+      "financial_documents",
+      "user_permissions",
+      "notification_preferences",
+      "scheduled_operations",
+      "scheduled_operation_payments"
+    ],
+    "usage": "Ce backup contient TOUTES les données nécessaires pour démarrer l'application sans dépendre de PostgreSQL"
   }
 ]

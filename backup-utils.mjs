@@ -17,14 +17,36 @@ function listBackups() {
   
   const backups = JSON.parse(fs.readFileSync(indexPath, 'utf-8'));
   
-  console.log('\n=== Sauvegardes disponibles ===\n');
+  console.log('\n' + '═'.repeat(80));
+  console.log('📦 SAUVEGARDES DISPONIBLES');
+  console.log('═'.repeat(80) + '\n');
+  
   backups.forEach((backup, idx) => {
     const date = new Date(backup.timestamp).toLocaleString('fr-FR');
-    console.log(`${idx + 1}. ${backup.name}`);
-    console.log(`   📅 ${date}`);
-    console.log(`   📊 ${backup.totalRows} lignes de ${backup.totalTables} tables\n`);
+    console.log(`${String(idx + 1).padStart(2, ' ')}. ${backup.name}`);
+    console.log(`    📅 Date: ${date}`);
+    console.log(`    📊 Lignes: ${backup.totalRows}`);
+    
+    if (backup.totalTablesInDb) {
+      console.log(`    📋 Tables trouvées: ${backup.totalTablesInDb}`);
+      console.log(`    ✅ Tables sauvegardées: ${backup.tablesBackedUp}`);
+      if (backup.tablesFailed > 0) {
+        console.log(`    ⚠️  Tables en erreur: ${backup.tablesFailed}`);
+      }
+      console.log(`    📈 Taux de succès: ${backup.statistics?.successRate || 'N/A'}`);
+    } else {
+      // Ancien format
+      console.log(`    📋 Tables: ${backup.totalTables}`);
+    }
+    
+    // Afficher la liste des tables sauvegardées
+    if (backup.tablesInBackup && backup.tablesInBackup.length > 0) {
+      console.log(`    📑 Tables: [${backup.tablesInBackup.slice(0, 5).join(', ')}${backup.tablesInBackup.length > 5 ? '...' : ''}]`);
+    }
+    console.log();
   });
   
+  console.log('═'.repeat(80) + '\n');
   return backups;
 }
 

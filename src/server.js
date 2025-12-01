@@ -28,6 +28,14 @@ const isRailway = process.env.RAILWAY_ENVIRONMENT_NAME !== undefined;
 
 // Try to load pg package dynamically
 async function initPgClient() {
+  // ✅ Mode local-only: désactiver PostgreSQL et utiliser uniquement les backups
+  // Cela évite les conflits de synchronisation entre DB et serveur en mémoire
+  console.log('📦 Mode LOCAL - Données serveur chargées depuis backup JSON');
+  console.log('⚠️  PostgreSQL DÉSACTIVÉ - Les écritures ne persistent pas à chaque redémarrage');
+  pgAvailable = false;
+  return;
+  
+  /* Code PostgreSQL désactivé pour éviter les conflits de sync
   try {
     const { default: pg } = await import('pg');
     const { Client } = pg;
@@ -66,6 +74,7 @@ async function initPgClient() {
     console.warn('⚠️  Paquet PostgreSQL non disponible:', error.message);
     pgAvailable = false;
   }
+  */
 }
 
 // Initialize immediately
