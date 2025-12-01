@@ -6,12 +6,12 @@
   "scripts": {
     "dev": "node --watch ./src/server.js",
     "start": "node ./src/server.js",
-    "backup": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/backup.ps1 -Mode quick",
-    "backup:full": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/backup.ps1 -Mode full",
-    "backups:list": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/backups-list.ps1",
-    "restore": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/restore.ps1",
-    "restore:latest": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/restore-latest.ps1",
-    "restore:interactive": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/restore-interactive.ps1"
+    "backup": "node backup-full.mjs",
+    "backup:full": "node backup-full.mjs",
+    "backups:list": "node list-backups.mjs",
+    "restore": "node restore-backup.mjs",
+    "restore:latest": "node restore-backup.mjs --latest",
+    "restore:interactive": "node restore-backup.mjs --interactive"
   },
   "dependencies": {
     "@chakra-ui/icons": "^2.2.4",
