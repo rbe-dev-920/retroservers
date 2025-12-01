@@ -146,6 +146,21 @@ app.get(['/auth/me','/api/auth/me'], requireAuth, (req, res) => {
   res.json({ user: member ? { id: member.id, email: member.email, permissions: member.permissions || [] } : null });
 });
 
+// Session validation - /api/me endpoint
+app.get('/api/me', requireAuth, (req, res) => {
+  const member = state.members[0] || null;
+  res.json({ 
+    user: member ? { 
+      id: member.id, 
+      email: member.email, 
+      firstName: member.firstName,
+      lastName: member.lastName,
+      permissions: member.permissions || [],
+      status: member.status || 'active'
+    } : null 
+  });
+});
+
 // FLASHES
 app.get(['/flashes','/api/flashes'], (req, res) => {
   res.json(state.flashes.filter(f => f.active));
