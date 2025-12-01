@@ -202,6 +202,81 @@ const requireAuth = (req, res, next) => {
   next();
 };
 
+// ✅ Fonction de sauvegarde persistante - sauvegarde les changements en mémoire dans le backup JSON
+let lastBackupPath = null;
+let saveDebounceTimer = null;
+
+function saveStateToBackup() {
+  if (!lastBackupPath) {
+    console.warn('⚠️  Chemin de backup non défini - impossible de sauvegarder');
+    return;
+  }
+  
+  try {
+    const backupData = {
+      timestamp: new Date().toISOString(),
+      description: 'Sauvegarde automatique des données en mémoire',
+      tables: {
+        members: {
+          count: state.members?.length || 0,
+          data: state.members || []
+        },
+        Vehicle: {
+          count: state.vehicles?.length || 0,
+          data: state.vehicles || []
+        },
+        Event: {
+          count: state.events?.length || 0,
+          data: state.events || []
+        },
+        site_users: {
+          count: state.siteUsers?.length || 0,
+          data: state.siteUsers || []
+        },
+        finance_transactions: {
+          count: state.transactions?.length || 0,
+          data: state.transactions || []
+        },
+        finance_expense_reports: {
+          count: state.expenseReports?.length || 0,
+          data: state.expenseReports || []
+        },
+        RetroNews: {
+          count: state.retroNews?.length || 0,
+          data: state.retroNews || []
+        },
+        Flash: {
+          count: state.flashes?.length || 0,
+          data: state.flashes || []
+        },
+        DevisLine: {
+          count: state.devisLines?.length || 0,
+          data: state.devisLines || []
+        },
+        QuoteTemplate: {
+          count: state.quoteTemplates?.length || 0,
+          data: state.quoteTemplates || []
+        },
+        financial_documents: {
+          count: state.financialDocuments?.length || 0,
+          data: state.financialDocuments || []
+        }
+      }
+    };
+    
+    fs.writeFileSync(lastBackupPath, JSON.stringify(backupData, null, 2), 'utf-8');
+    console.log(`✅ Données sauvegardées dans ${path.basename(path.dirname(lastBackupPath))}`);
+  } catch (error) {
+    console.error('❌ Erreur lors de la sauvegarde:', error.message);
+  }
+}
+
+// Fonction debounce pour éviter trop d'écritures disque
+function debouncedSave() {
+  clearTimeout(saveDebounceTimer);
+  saveDebounceTimer = setTimeout(saveStateToBackup, 500);
+}
+
 // Function to load data from backup
 async function initializeFromBackup() {
   // ⚠️ Ne faire l'import qu'une seule fois au démarrage du serveur
@@ -227,6 +302,9 @@ async function initializeFromBackup() {
       console.log('⚠️  Fichier de backup introuvable - utilisation des données par défaut');
       return;
     }
+    
+    // ✅ Enregistrer le chemin du backup pour les futures sauvegardes
+    lastBackupPath = backupPath;
     
     const backupData = JSON.parse(fs.readFileSync(backupPath, 'utf-8'));
     console.log(`✅ Backup chargé: ${latestBackup.name}`);
@@ -820,19 +898,25 @@ app.post(['/api/members','/members'], requireAuth, (req, res) => {
 });
 app.put(['/api/members','/members'], requireAuth, (req, res) => {
   const { id } = req.body;
-  state.members = state.members.map(m => m.id === id ? { ...m, ...req.body } : m);
+  state.members = state.members.map(m => m.id === id ? { ...m, ...req.body, updatedAt: new Date().toISOString() } : m);
   const member = state.members.find(m => m.id === id);
+  debouncedSave();
+  console.log(`✅ Adhérent ${id} modifié et sauvegardé`);
   res.json({ member });
 });
 app.patch(['/api/members','/members'], requireAuth, (req, res) => {
   const { id } = req.body;
-  state.members = state.members.map(m => m.id === id ? { ...m, ...req.body } : m);
+  state.members = state.members.map(m => m.id === id ? { ...m, ...req.body, updatedAt: new Date().toISOString() } : m);
   const member = state.members.find(m => m.id === id);
+  debouncedSave();
+  console.log(`✅ Adhérent ${id} patchié et sauvegardé`);
   res.json({ member });
 });
 app.delete(['/api/members','/members'], requireAuth, (req, res) => {
   const { id } = req.body;
   state.members = state.members.filter(m => m.id !== id);
+  debouncedSave();
+  console.log(`✅ Adhérent ${id} supprimé et sauvegardé`);
   res.json({ ok: true });
 });
 app.post('/api/members/change-password', requireAuth, (req, res) => {
@@ -840,7 +924,9 @@ app.post('/api/members/change-password', requireAuth, (req, res) => {
 });
 app.post('/api/members/:id/terminate', requireAuth, (req, res) => {
   const { id } = req.params;
-  state.members = state.members.map(m => m.id === id ? { ...m, status: 'terminated' } : m);
+  state.members = state.members.map(m => m.id === id ? { ...m, status: 'terminated', updatedAt: new Date().toISOString() } : m);
+  debouncedSave();
+  console.log(`✅ Adhérent ${id} terminé et sauvegardé`);
   res.json({ ok: true });
 });
 app.post('/api/members/:id/link-access', requireAuth, (req, res) => {
@@ -895,6 +981,11 @@ app.put(['/api/members/:id', '/members/:id'], requireAuth, (req, res) => {
   
   state.members[memberIndex] = updatedMember;
   
+  // ✅ Sauvegarder les changements en persistant le backup
+  debouncedSave();
+  
+  console.log(`✅ Adhérent ${id} mis à jour et sauvegardé`);
+  
   res.json({ success: true, member: updatedMember });
 });
 
@@ -937,8 +1028,11 @@ app.put('/api/members/:id/permissions', requireAuth, (req, res) => {
   
   // Also update member permissions
   state.members = state.members.map(m => 
-    m.id === id ? { ...m, permissions: Array.isArray(permissions) ? permissions : [] } : m
+    m.id === id ? { ...m, permissions: Array.isArray(permissions) ? permissions : [], updatedAt: new Date().toISOString() } : m
   );
+  
+  // ✅ Sauvegarder les changements
+  debouncedSave();
   
   res.json({ 
     ok: true, 
