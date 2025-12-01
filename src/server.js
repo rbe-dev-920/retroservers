@@ -127,6 +127,24 @@ const state = {
   vehicleServiceSchedule: [
     // { id, parc, serviceType, description, frequency, priority, status, plannedDate }
   ],
+  vehicleAdministration: [
+    // { id, parc, type: 'carteGrise'|'assurance'|'controleTechnique'|'certificatCession', documents: [], expiryDate, status, notes }
+  ],
+  vehicleCarteGrise: [
+    // { id, parc, oldCGPath, newCGPath, oldCGBarred, dateImport, notes }
+  ],
+  vehicleAssurance: [
+    // { id, parc, attestationPath, dateValidityStart, dateValidityEnd, timeValidityStart, timeValidityEnd, isActive, notes }
+  ],
+  vehicleControleTechnique: [
+    // { id, parc, attestationPath, ctDate, ctStatus: 'passed'|'contre-visite'|'failed', nextCtDate, mileage, notes }
+  ],
+  vehicleCertificatCession: [
+    // { id, parc, certificatPath, dateImport, notes, imported: true }
+  ],
+  vehicleEchancier: [
+    // { id, parc, type: 'assurance'|'ct'|'cg', description, dueDate, status: 'pending'|'done'|'expired', notes }
+  ],
   userPermissions: {}  // { userId: { permissions: [...], membershipType, linkedAt } }
 };
 
