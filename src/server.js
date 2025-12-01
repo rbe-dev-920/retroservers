@@ -2,6 +2,13 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import multer from 'multer';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { getLatestBackup } from './backup-utils.mjs';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 dotenv.config();
 
@@ -10,10 +17,11 @@ const upload = multer({ dest: 'uploads/' });
 const PORT = process.env.PORT || 4000;
 const pathRoot = process.cwd();
 
-// PostgreSQL connection for data recovery (optional)
+// PostgreSQL connection for data recovery (optional) - DÉSACTIVÉ
 let pgClient = null;
 let pgAvailable = false;
 let postgresDataImported = false;  // Flag pour tracker si import déjà fait
+const LOAD_FROM_BACKUP = true;  // ✅ Charger depuis backup au lieu de PostgreSQL
 
 // Déterminer si on est sur Railway
 const isRailway = process.env.RAILWAY_ENVIRONMENT_NAME !== undefined;
@@ -182,23 +190,215 @@ const requireAuth = (req, res, next) => {
   next();
 };
 
-// Function to load data from PostgreSQL (only once)
-async function initializeFromPostgres() {
+// Function to load data from backup
+async function initializeFromBackup() {
   // ⚠️ Ne faire l'import qu'une seule fois au démarrage du serveur
   if (postgresDataImported) {
-    console.log('📌 Import PostgreSQL déjà effectué - données conservées en mémoire');
-    return;
-  }
-  
-  if (!pgAvailable || !pgClient) {
-    console.log('⚠️  PostgreSQL not available, using in-memory data');
+    console.log('📌 Données déjà chargées - conservées en mémoire');
     return;
   }
   
   try {
-    console.log('🔗 Tentative de connexion à PostgreSQL...');
-    await pgClient.connect();
-    console.log('✅ Connecté à PostgreSQL - chargement des données...');
+    console.log('🔄 Chargement des données depuis le backup...');
+    
+    const latestBackup = getLatestBackup();
+    
+    if (!latestBackup) {
+      console.log('⚠️  Aucun backup trouvé - utilisation des données par défaut');
+      return;
+    }
+    
+    const backupDir = path.join(__dirname, 'backups');
+    const backupPath = path.join(backupDir, latestBackup.name, 'data.json');
+    
+    if (!fs.existsSync(backupPath)) {
+      console.log('⚠️  Fichier de backup introuvable - utilisation des données par défaut');
+      return;
+    }
+    
+    const backupData = JSON.parse(fs.readFileSync(backupPath, 'utf-8'));
+    console.log(`✅ Backup chargé: ${latestBackup.name}`);
+    
+    // Load members
+    if (backupData.tables.members?.data) {
+      state.members = backupData.tables.members.data.map(m => ({
+        id: m.id,
+        email: m.email,
+        firstName: m.firstName,
+        lastName: m.lastName,
+        status: m.membershipStatus || 'active',
+        permissions: ['view_dashboard', 'view_vehicles'],
+        createdAt: m.createdAt || new Date().toISOString()
+      }));
+      console.log(`   👥 ${state.members.length} membres restaurés`);
+    }
+    
+    // Load vehicles
+    if (backupData.tables.Vehicle?.data) {
+      state.vehicles = backupData.tables.Vehicle.data.map(v => ({
+        parc: v.parc,
+        marque: v.marque,
+        modele: v.modele,
+        etat: v.etat,
+        fuel: v.fuel || 0,
+        caracteristiques: [{ label: 'Niveau carburant', value: String(v.fuel || 0) }],
+        id: v.id,
+        createdAt: v.createdAt || new Date().toISOString()
+      }));
+      console.log(`   🚌 ${state.vehicles.length} véhicules restaurés`);
+    }
+    
+    // Load events
+    if (backupData.tables.Event?.data) {
+      state.events = backupData.tables.Event.data.map(e => ({
+        id: e.id,
+        title: e.title,
+        description: e.description,
+        date: e.date,
+        status: e.status,
+        createdAt: e.createdAt || new Date().toISOString()
+      }));
+      console.log(`   📅 ${state.events.length} événements restaurés`);
+    }
+    
+    // Load financial categories
+    if (backupData.tables.finance_categories?.data && backupData.tables.finance_categories.data.length > 0) {
+      state.categories = backupData.tables.finance_categories.data.map(c => ({
+        id: c.id,
+        name: c.name,
+        type: c.type || 'depense'
+      }));
+      console.log(`   💰 ${state.categories.length} catégories financières restaurées`);
+    }
+    
+    // Load financial transactions
+    if (backupData.tables.finance_transactions?.data) {
+      state.transactions = backupData.tables.finance_transactions.data.map(t => ({
+        id: t.id,
+        category: t.category,
+        type: t.type,
+        amount: t.amount,
+        description: t.description,
+        date: t.date,
+        createdAt: t.createdAt || new Date().toISOString()
+      }));
+      console.log(`   📊 ${state.transactions.length} transactions restaurées`);
+    }
+    
+    // Load financial balance
+    if (backupData.tables.finance_balances?.data?.length > 0) {
+      state.bankBalance = backupData.tables.finance_balances.data[0].balance || 0;
+      console.log(`   🏦 Solde: ${state.bankBalance}€`);
+    }
+    
+    // Load expense reports
+    if (backupData.tables.finance_expense_reports?.data) {
+      state.expenseReports = backupData.tables.finance_expense_reports.data.map(e => ({
+        id: e.id,
+        description: e.description,
+        amount: e.amount,
+        status: e.status,
+        date: e.date,
+        createdAt: e.createdAt || new Date().toISOString()
+      }));
+      console.log(`   📋 ${state.expenseReports.length} rapports de dépenses restaurés`);
+    }
+    
+    // Load user permissions (CRITICAL!)
+    if (backupData.tables.user_permissions?.data) {
+      backupData.tables.user_permissions.data.forEach(p => {
+        if (!state.userPermissions[p.userId]) {
+          state.userPermissions[p.userId] = { permissions: [] };
+        }
+        state.userPermissions[p.userId].permissions.push({
+          id: p.id,
+          resource: p.resource,
+          actions: Array.isArray(p.actions) ? p.actions : (typeof p.actions === 'string' ? JSON.parse(p.actions) : []),
+          grantedAt: p.grantedAt || p.createdAt
+        });
+      });
+      console.log(`   🔐 ${Object.keys(state.userPermissions).length} utilisateurs avec permissions restaurés`);
+    }
+    
+    // Load RetroNews
+    if (backupData.tables.RetroNews?.data) {
+      state.retroNews = backupData.tables.RetroNews.data.map(n => ({
+        id: n.id,
+        title: n.title,
+        content: n.content,
+        excerpt: n.excerpt,
+        imageUrl: n.imageUrl,
+        author: n.author,
+        published: n.published,
+        featured: n.featured,
+        createdAt: n.createdAt || new Date().toISOString()
+      }));
+      console.log(`   📰 ${state.retroNews.length} actualités restaurées`);
+    }
+    
+    // Load Flashes
+    if (backupData.tables.Flash?.data) {
+      state.flashes = backupData.tables.Flash.data.map(f => ({
+        id: f.id,
+        content: f.content,
+        type: f.type,
+        active: f.active,
+        createdAt: f.createdAt || new Date().toISOString()
+      }));
+      console.log(`   ⚡ ${state.flashes.length} flashes restaurées`);
+    }
+    
+    // Load Documents
+    if (backupData.tables.Document?.data && backupData.tables.Document.data.length > 0) {
+      state.documents = backupData.tables.Document.data.map(d => ({
+        id: d.id,
+        fileName: d.fileName,
+        filePath: d.filePath,
+        fileSize: d.fileSize,
+        mimeType: d.mimeType,
+        type: d.type,
+        status: d.status,
+        uploadedAt: d.uploadedAt || new Date().toISOString()
+      }));
+      console.log(`   📄 ${state.documents.length} documents restaurés`);
+    }
+    
+    // Load Vehicle Maintenance
+    if (backupData.tables.vehicle_maintenance?.data && backupData.tables.vehicle_maintenance.data.length > 0) {
+      state.vehicleMaintenance = backupData.tables.vehicle_maintenance.data.map(m => ({
+        id: m.id,
+        vehicleId: m.vehicleId,
+        type: m.type,
+        description: m.description,
+        cost: m.cost,
+        status: m.status,
+        date: m.date
+      }));
+      console.log(`   🔧 ${state.vehicleMaintenance.length} maintenances de véhicules restaurées`);
+    }
+    
+    // Load Vehicle Service Schedule
+    if (backupData.tables.vehicle_service_schedule?.data && backupData.tables.vehicle_service_schedule.data.length > 0) {
+      state.vehicleServiceSchedule = backupData.tables.vehicle_service_schedule.data.map(s => ({
+        id: s.id,
+        vehicleId: s.vehicleId,
+        serviceType: s.serviceType,
+        description: s.description,
+        frequency: s.frequency,
+        status: s.status
+      }));
+      console.log(`   📅 ${state.vehicleServiceSchedule.length} services programmés restaurés`);
+    }
+    
+    // ✅ Marquer l'import comme terminé
+    postgresDataImported = true;
+    console.log('✅ Initialisation depuis backup terminée - données verrouillées en mémoire');
+    
+  } catch (error) {
+    console.error('❌ Erreur lors du chargement du backup:', error.message);
+    console.log('📝 Utilisation des données par défaut en mémoire');
+  }
+}
     
     // Load members
     const membersRes = await pgClient.query(`
@@ -1151,6 +1351,6 @@ app.use((err, req, res, next) => {
 
 app.listen(PORT, async () => {
   console.log(`API reconstruction server running on port ${PORT}`);
-  // Initialize data from PostgreSQL
-  await initializeFromPostgres();
+  // Initialize data from backup (with permissions)
+  await initializeFromBackup();
 });

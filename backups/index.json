@@ -1,0 +1,32 @@
+[
+  {
+    "name": "backup_2025-12-01T14-21-30",
+    "timestamp": "2025-12-01T14:21:30.824Z",
+    "totalRows": 35,
+    "totalTables": 22,
+    "tablesBackedup": [
+      "members",
+      "Vehicle",
+      "Event",
+      "finance_transactions",
+      "finance_categories",
+      "finance_balances",
+      "finance_expense_reports",
+      "user_permissions",
+      "RetroNews",
+      "Flash",
+      "Document",
+      "vehicle_maintenance",
+      "vehicle_service_schedule",
+      "site_users",
+      "notification_preferences",
+      "scheduled_operations",
+      "scheduled_operation_payments",
+      "Stock",
+      "StockMovement",
+      "Usage",
+      "Report",
+      "Changelog"
+    ]
+  }
+]
