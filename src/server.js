@@ -432,15 +432,29 @@ app.get(['/auth/me','/api/auth/me'], requireAuth, (req, res) => {
 // Session validation - /api/me endpoint
 app.get('/api/me', requireAuth, (req, res) => {
   const member = state.members[0] || null;
+  if (!member) {
+    return res.json({ user: null });
+  }
+
+  // Try to find the user's site_users record to get the role
+  let role = 'MEMBER'; // default
+  if (state.siteUsers && member.id) {
+    const siteUser = state.siteUsers.find(u => u.linkedMemberId === member.id);
+    if (siteUser) {
+      role = siteUser.role || 'MEMBER';
+    }
+  }
+
   res.json({ 
-    user: member ? { 
+    user: { 
       id: member.id, 
       email: member.email, 
       firstName: member.firstName,
       lastName: member.lastName,
+      role: role,  // ADD ROLE HERE
       permissions: member.permissions || [],
       status: member.status || 'active'
-    } : null 
+    }
   });
 });
 
