@@ -2,13 +2,25 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import multer from 'multer';
+import pkg from 'pg';
 
 dotenv.config();
 
+const { Client } = pkg;
 const app = express();
 const upload = multer({ dest: 'uploads/' });
 const PORT = process.env.PORT || 4000;
 const pathRoot = process.cwd();
+
+// PostgreSQL connection for data recovery
+const pgClient = new Client({
+  host: process.env.DB_HOST || 'yamanote.proxy.rlwy.net',
+  port: process.env.DB_PORT || 18663,
+  user: process.env.DB_USER || 'postgres',
+  password: process.env.DB_PASSWORD || 'kufBlJfvgFQSHCnQyUgVqwGLthMXtyot',
+  database: process.env.DB_NAME || 'railway',
+  ssl: false
+});
 
 // In-memory stores (reconstruction). À migrer vers Prisma ensuite.
 const state = {
@@ -127,6 +139,80 @@ const requireAuth = (req, res, next) => {
   if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
   next();
 };
+
+// Function to load data from PostgreSQL
+async function initializeFromPostgres() {
+  try {
+    await pgClient.connect();
+    console.log('✅ Connected to PostgreSQL - loading data...');
+    
+    // Load members
+    const membersRes = await pgClient.query(`
+      SELECT id, email, "firstName", "lastName", "membershipStatus", "createdAt"
+      FROM members
+      LIMIT 100
+    `);
+    
+    if (membersRes.rows.length > 0) {
+      state.members = membersRes.rows.map(m => ({
+        id: m.id,
+        email: m.email,
+        firstName: m.firstName,
+        lastName: m.lastName,
+        status: m.membershipStatus || 'active',
+        permissions: ['view_dashboard', 'view_vehicles'],
+        createdAt: m.createdAt?.toISOString() || new Date().toISOString()
+      }));
+      console.log(`   📌 Loaded ${state.members.length} members from PostgreSQL`);
+    }
+    
+    // Load vehicles
+    const vehiclesRes = await pgClient.query(`
+      SELECT id, "parkingNumber", brand, model, status, "fuelLevel", "createdAt"
+      FROM "Vehicle"
+      LIMIT 100
+    `);
+    
+    if (vehiclesRes.rows.length > 0) {
+      state.vehicles = vehiclesRes.rows.map(v => ({
+        parc: v.parkingNumber,
+        marque: v.brand,
+        modele: v.model,
+        etat: v.status,
+        fuel: v.fuelLevel || 0,
+        caracteristiques: [{ label: 'Niveau carburant', value: String(v.fuelLevel || 0) }],
+        id: v.id,
+        createdAt: v.createdAt?.toISOString() || new Date().toISOString()
+      }));
+      console.log(`   🚌 Loaded ${state.vehicles.length} vehicles from PostgreSQL`);
+    }
+    
+    // Load events
+    const eventsRes = await pgClient.query(`
+      SELECT id, title, description, date, status, "createdAt"
+      FROM "Event"
+      LIMIT 100
+    `);
+    
+    if (eventsRes.rows.length > 0) {
+      state.events = eventsRes.rows.map(e => ({
+        id: e.id,
+        title: e.title,
+        description: e.description,
+        date: e.date,
+        status: e.status,
+        createdAt: e.createdAt?.toISOString() || new Date().toISOString()
+      }));
+      console.log(`   📅 Loaded ${state.events.length} events from PostgreSQL`);
+    }
+    
+    console.log('✅ Data initialization from PostgreSQL complete');
+    
+  } catch (error) {
+    console.error('⚠️  Could not load from PostgreSQL:', error.message);
+    console.log('   Using fallback in-memory data...');
+  }
+}
 
 // Health & version
 app.get(['/api/health','/health'], (req, res) => res.json({ ok: true, time: new Date().toISOString(), version: 'rebuild-1' }));
@@ -620,6 +706,8 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal server error' });
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`API reconstruction server running on port ${PORT}`);
+  // Initialize data from PostgreSQL
+  await initializeFromPostgres();
 });
