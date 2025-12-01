@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import multer from 'multer';
+import { initDatabase, vehicleStore, memberStore, useDatabase } from './persistence.js';
 
 dotenv.config();
 
@@ -623,6 +624,16 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal server error' });
 });
 
-app.listen(PORT, () => {
-  console.log(`API reconstruction server running on port ${PORT}`);
+// Initialize database and start server
+(async () => {
+  await initDatabase();
+  app.listen(PORT, () => {
+    console.log(`API reconstruction server running on port ${PORT}`);
+    if (!useDatabase) {
+      console.log('📝 Note: Using in-memory storage. Data will be lost on restart.');
+    }
+  });
+})().catch(err => {
+  console.error('Failed to start server:', err);
+  process.exit(1);
 });
