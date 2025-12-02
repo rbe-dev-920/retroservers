@@ -49,15 +49,48 @@ model UserPermission {
 // ===== VÉHICULES =====
 
 model Vehicle {
-  id              Int      @id @default(autoincrement())
-  parc            String   @unique
-  marque          String?
-  modele          String?
-  etat            String?  @default("disponible")
-  fuel            Int?     @default(0)
-  caracteristiques String? // JSON
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id                    Int      @id @default(autoincrement())
+  parc                  String   @unique
+  // Informations de base
+  marque                String?
+  modele                String?
+  type                  String?  @default("Bus")
+  etat                  String?  @default("disponible")
+  subtitle              String?
+  description           String?
+  history               String?
+  isPublic              Boolean  @default(false)
+  
+  // Immatriculation et identification
+  immat                 String?
+  numerosFlotte         String?
+  constructeur          String?
+  
+  // Caractéristiques techniques
+  energie               String?
+  miseEnCirculation     DateTime?
+  longueur              String?
+  placesAssises         Int?
+  placesDebout          Int?
+  ufr                   String?
+  moteur                String?
+  boiteVitesses         String?
+  nombrePortes          Int?
+  climatisation         String?
+  girouette             String?
+  normeEuro             String?
+  livree                String?
+  
+  // État et préservation
+  statut                String?
+  preservePar           String?
+  
+  // Autres
+  fuel                  Int?     @default(0)
+  caracteristiques      String?  // JSON array pour champs supplémentaires
+  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 }
 
 model VehicleUsage {
