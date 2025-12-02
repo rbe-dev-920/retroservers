@@ -1042,7 +1042,7 @@ app.put(['/vehicles/:parc','/api/vehicles/:parc'], requireAuth, async (req, res)
 // Usages (historique pointages) - PRISMA avec fallback
 app.get(['/vehicles/:parc/usages','/api/vehicles/:parc/usages'], requireAuth, async (req, res) => {
   try {
-    const usages = await prisma.vehicleUsage.findMany({
+    const usages = await prisma.usage.findMany({
       where: { parc: req.params.parc },
       orderBy: { startedAt: 'desc' }
     });
@@ -1055,7 +1055,7 @@ app.get(['/vehicles/:parc/usages','/api/vehicles/:parc/usages'], requireAuth, as
 
 app.post(['/vehicles/:parc/usages','/api/vehicles/:parc/usages'], requireAuth, async (req, res) => {
   try {
-    const usage = await prisma.vehicleUsage.create({
+    const usage = await prisma.usage.create({
       data: {
         parc: req.params.parc,
         conducteur: req.body?.conducteur || 'Conducteur',
@@ -1072,7 +1072,7 @@ app.post(['/vehicles/:parc/usages','/api/vehicles/:parc/usages'], requireAuth, a
 
 app.post(['/vehicles/:parc/usages/:id/end','/api/vehicles/:parc/usages/:id/end'], requireAuth, async (req, res) => {
   try {
-    const usage = await prisma.vehicleUsage.update({
+    const usage = await prisma.usage.update({
       where: { id: req.params.id },
       data: { endedAt: new Date() }
     });
