@@ -1073,20 +1073,20 @@ app.put(['/vehicles/:parc','/api/vehicles/:parc'], requireAuth, async (req, res)
 // Usages (historique pointages) - PRISMA avec fallback
 app.get(['/vehicles/:parc/usages','/api/vehicles/:parc/usages'], requireAuth, async (req, res) => {
   try {
-    const usages = await prisma.usage.findMany({
+    const usages = await prisma.vehicleUsage.findMany({
       where: { parc: req.params.parc },
       orderBy: { startedAt: 'desc' }
     });
     res.json(usages);
   } catch (e) {
     console.error('Erreur GET usages (Prisma):', e.message);
-    res.json([]);
+    res.status(500).json({ error: e.message });
   }
 });
 
 app.post(['/vehicles/:parc/usages','/api/vehicles/:parc/usages'], requireAuth, async (req, res) => {
   try {
-    const usage = await prisma.usage.create({
+    const usage = await prisma.vehicleUsage.create({
       data: {
         parc: req.params.parc,
         conducteur: req.body?.conducteur || 'Conducteur',
@@ -1103,7 +1103,7 @@ app.post(['/vehicles/:parc/usages','/api/vehicles/:parc/usages'], requireAuth, a
 
 app.post(['/vehicles/:parc/usages/:id/end','/api/vehicles/:parc/usages/:id/end'], requireAuth, async (req, res) => {
   try {
-    const usage = await prisma.usage.update({
+    const usage = await prisma.vehicleUsage.update({
       where: { id: req.params.id },
       data: { endedAt: new Date() }
     });
@@ -1117,7 +1117,7 @@ app.post(['/vehicles/:parc/usages/:id/end','/api/vehicles/:parc/usages/:id/end']
 // Maintenance - PRISMA avec fallback
 app.get(['/vehicles/:parc/maintenance','/api/vehicles/:parc/maintenance'], requireAuth, async (req, res) => {
   try {
-    const maintenance = await prisma.vehicle_maintenance.findMany({
+    const maintenance = await prisma.vehicleMaintenance.findMany({
       where: { parc: req.params.parc },
       orderBy: { date: 'desc' }
     });
@@ -1130,7 +1130,7 @@ app.get(['/vehicles/:parc/maintenance','/api/vehicles/:parc/maintenance'], requi
 
 app.post(['/vehicles/:parc/maintenance','/api/vehicles/:parc/maintenance'], requireAuth, async (req, res) => {
   try {
-    const item = await prisma.vehicle_maintenance.create({
+    const item = await prisma.vehicleMaintenance.create({
       data: {
         parc: req.params.parc,
         type: req.body?.type,
@@ -1186,8 +1186,8 @@ app.post(['/vehicles/:parc/service-schedule','/api/vehicles/:parc/service-schedu
 app.get(['/vehicles/:parc/maintenance-summary','/api/vehicles/:parc/maintenance-summary'], requireAuth, async (req, res) => {
   try {
     const parc = req.params.parc;
-    const maintenance = await prisma.vehicle_maintenance.findMany({ where: { parc } });
-    const schedule = await prisma.vehicle_service_schedule.findMany({ where: { parc } });
+    const maintenance = await prisma.vehicleMaintenance.findMany({ where: { parc } });
+    const schedule = await prisma.vehicleServiceSchedule.findMany({ where: { parc } });
     
     const totalCost = maintenance.reduce((s, m) => s + (m.cost || 0), 0);
     const maintenanceCount = maintenance.length;
