@@ -747,6 +747,22 @@ model VehicleControlTechnique {
   @@index([ctDate])
 }
 
+model VehicleCessionCertificate {
+  id              String   @id
+  parc            String   @unique
+  certificateUrl  String?
+  certificatePath String?
+  issuedDate      DateTime?
+  issuedBy        String?
+  notes           String?
+  dateImport      DateTime @default(now())
+  imported        Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime
+
+  @@index([parc])
+}
+
 enum DocumentStatus {
   PENDING
   APPROVED

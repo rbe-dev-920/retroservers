@@ -48,10 +48,10 @@ try {
   
   const updateRes = await c.query(
     `UPDATE members 
-     SET permissions = $1
+     SET permissions = $1::jsonb
      WHERE id = $2
      RETURNING id, email, permissions`,
-    [permissionsArray, memberId]
+    [JSON.stringify(permissionsArray), memberId]
   );
   
   console.log('\n✅ Permissions updated for w.belaidi:');
