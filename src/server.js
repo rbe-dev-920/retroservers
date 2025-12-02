@@ -737,10 +737,46 @@ app.get('/public/events/:id', async (req, res) => {
 });
 
 // Public vehicles endpoint - avec fallback en mémoire
+// Normalize vehicle data by extracting caracteristiques from JSON
+const normalizeVehicleWithCaracteristiques = (vehicle) => {
+  if (!vehicle) return vehicle;
+  
+  const normalized = { ...vehicle };
+  
+  // Parse caracteristiques JSON if it exists
+  if (vehicle.caracteristiques && typeof vehicle.caracteristiques === 'string') {
+    try {
+      const caract = JSON.parse(vehicle.caracteristiques);
+      if (Array.isArray(caract)) {
+        // Create a map of label -> value for easier access
+        caract.forEach(item => {
+          if (item.label && item.value) {
+            const key = item.label
+              .toLowerCase()
+              .replace(/é/g, 'e')
+              .replace(/è/g, 'e')
+              .replace(/ç/g, 'c')
+              .replace(/\s+/g, '_')
+              .replace(/[^a-z0-9_]/g, '');
+            normalized[key] = item.value;
+          }
+        });
+        // Also keep the original array for compatibility
+        normalized.caracteristiques = caract;
+      }
+    } catch (e) {
+      console.warn('⚠️ Failed to parse caracteristiques for vehicle', vehicle.parc);
+    }
+  }
+  
+  return normalized;
+};
+
 app.get('/public/vehicles', async (req, res) => {
   try {
     const vehicles = await prisma.vehicle.findMany();
-    res.json(vehicles);
+    const normalized = vehicles.map(v => normalizeVehicleWithCaracteristiques(v));
+    res.json(normalized);
   } catch (e) {
     console.error('❌ GET /public/vehicles error:', e.message);
     res.status(500).json({ error: 'Failed to fetch vehicles', details: e.message });
@@ -753,7 +789,8 @@ app.get('/public/vehicles/:id', async (req, res) => {
       where: { OR: [{ id: parseInt(req.params.id) || 0 }, { parc: req.params.id }] }
     });
     if (!vehicle) return res.status(404).json({ error: 'Vehicle not found' });
-    res.json(vehicle);
+    const normalized = normalizeVehicleWithCaracteristiques(vehicle);
+    res.json(normalized);
   } catch (e) {
     console.error('❌ GET /public/vehicles/:id error:', e.message);
     res.status(500).json({ error: 'Failed to fetch vehicle', details: e.message });
@@ -1787,15 +1824,14 @@ app.get(['/vehicles', '/api/vehicles'], requireAuth, async (req, res) => {
   if (prisma) {
     try {
       const vehicles = await prisma.vehicle.findMany({ orderBy: { parc: 'asc' } });
-      return res.json({ vehicles });
+      const normalized = vehicles.map(v => normalizeVehicleWithCaracteristiques(v));
+      return res.json({ vehicles: normalized });
     } catch (e) {
-      console.error('Erreur GET /vehicles (Prisma):', e.message);
+      console.error('❌ GET /vehicles error:', e.message);
+      return res.status(500).json({ error: 'Failed to fetch vehicles', details: e.message });
     }
   }
-  if (ENABLE_MEMORY_FALLBACK) {
-    return res.json({ vehicles: state.vehicles || [] });
-  }
-  res.status(503).json({ error: 'Prisma indisponible et mémoire désactivée' });
+  res.status(503).json({ error: 'Prisma unavailable' });
 });
 
 app.get(['/vehicles/:parc', '/api/vehicles/:parc'], requireAuth, async (req, res) => {
@@ -1808,9 +1844,11 @@ app.get(['/vehicles/:parc', '/api/vehicles/:parc'], requireAuth, async (req, res
       }
       const vehicle = await prisma.vehicle.findFirst({ where: { OR: filters } });
       if (!vehicle) return res.status(404).json({ error: 'Not found' });
-      return res.json({ vehicle });
+      const normalized = normalizeVehicleWithCaracteristiques(vehicle);
+      return res.json({ vehicle: normalized });
     } catch (e) {
-      console.error('Erreur GET /vehicles/:parc (Prisma):', e.message);
+      console.error('❌ GET /vehicles/:parc error:', e.message);
+      return res.status(500).json({ error: 'Failed to fetch vehicle', details: e.message });
     }
   }
   if (ENABLE_MEMORY_FALLBACK) {
