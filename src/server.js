@@ -1914,9 +1914,6 @@ app.delete(['/events/:id', '/api/events/:id'], requireAuth, async (req, res) => 
   }
 });
 
-  res.status(500).json({ error: 'Database error' });
-});
-
 // FINANCE
 app.get(['/finance/stats', '/api/finance/stats'], requireAuth, (req, res) => {
   const revenue = state.transactions.filter(t => t.type === 'recette').reduce((s,t)=>s+t.amount,0);
