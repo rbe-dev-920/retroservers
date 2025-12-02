@@ -1831,159 +1831,178 @@ app.get('/api/members/:id/permissions', requireAuth, (req, res) => {
 });
 
 // PUT update member permissions
-app.put('/api/members/:id/permissions', requireAuth, (req, res) => {
-  const { id } = req.params;
-  const { permissions = [], membershipType } = req.body || {};
-  
-  const member = state.members.find(m => m.id === id);
-  if (!member) return res.status(404).json({ error: 'Member not found' });
-  
-  // Update in state
-  if (!state.userPermissions) state.userPermissions = {};
-  
-  state.userPermissions[id] = {
-    id,
-    email: member.email,
-    membershipType: membershipType || member.membershipType || 'STANDARD',
-    permissions: Array.isArray(permissions) ? permissions : [],
-    linkedAt: state.userPermissions[id]?.linkedAt || member.createdAt,
-    lastModified: new Date().toISOString()
-  };
-  
-  // Also update member permissions
-  state.members = state.members.map(m => 
-    m.id === id ? { ...m, permissions: Array.isArray(permissions) ? permissions : [], updatedAt: new Date().toISOString() } : m
-  );
-  
-  // ✅ Sauvegarder les changements
-  debouncedSave();
-  
-  res.json({ 
-    ok: true, 
-    message: 'Permissions mises à jour',
-    userPermissions: state.userPermissions[id]
-  });
+// ✅ NOW USING PRISMA
+app.put('/api/members/:id/permissions', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { permissions = [], membershipType } = req.body || {};
+    
+    // Update member permissions in Prisma
+    const member = await prisma.members.update({
+      where: { id },
+      data: {
+        permissions: Array.isArray(permissions) ? permissions : [],
+        membershipType: membershipType || undefined
+      }
+    });
+    
+    res.json({ 
+      ok: true, 
+      message: 'Permissions mises à jour',
+      member
+    });
+  } catch (e) {
+    console.error('❌ Error updating member permissions:', e.message);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // POST add permission to member
-app.post('/api/members/:id/permissions', requireAuth, (req, res) => {
-  const { id } = req.params;
-  const { resource, actions = ['READ'], expiresAt } = req.body || {};
-  
-  if (!resource) return res.status(400).json({ error: 'Resource required' });
-  
-  const member = state.members.find(m => m.id === id);
-  if (!member) return res.status(404).json({ error: 'Member not found' });
-  
-  if (!state.userPermissions) state.userPermissions = {};
-  if (!state.userPermissions[id]) {
-    state.userPermissions[id] = {
-      id,
-      email: member.email,
-      membershipType: member.membershipType || 'STANDARD',
-      permissions: [],
-      linkedAt: member.createdAt,
-      lastModified: new Date().toISOString()
-    };
+// ✅ NOW USING PRISMA
+app.post('/api/members/:id/permissions', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { permission } = req.body || {};
+    
+    if (!permission) return res.status(400).json({ error: 'Permission required' });
+    
+    // Get current permissions
+    const member = await prisma.members.findUnique({
+      where: { id },
+      select: { permissions: true }
+    });
+    
+    if (!member) return res.status(404).json({ error: 'Member not found' });
+    
+    const currentPerms = member.permissions || [];
+    const newPerms = Array.isArray(currentPerms) ? [...currentPerms] : [];
+    
+    // Add new permission if not already exists
+    if (!newPerms.includes(permission)) {
+      newPerms.push(permission);
+    }
+    
+    // Update member
+    const updated = await prisma.members.update({
+      where: { id },
+      data: { permissions: newPerms }
+    });
+    
+    res.json({ 
+      ok: true, 
+      message: 'Permission ajoutée',
+      member: updated
+    });
+  } catch (e) {
+    console.error('❌ Error adding permission:', e.message);
+    res.status(500).json({ error: e.message });
   }
-  
-  // Add or update permission
-  const permIndex = state.userPermissions[id].permissions.findIndex(p => p.resource === resource);
-  const newPerm = { resource, actions, expiresAt };
-  
-  if (permIndex >= 0) {
-    state.userPermissions[id].permissions[permIndex] = newPerm;
-  } else {
-    state.userPermissions[id].permissions.push(newPerm);
-  }
-  
-  state.userPermissions[id].lastModified = new Date().toISOString();
-  
-  debouncedSave();
-  res.json({ 
-    ok: true, 
-    message: 'Permission ajoutée',
-    userPermissions: state.userPermissions[id]
-  });
 });
 
 // DELETE permission from member
-app.delete('/api/members/:id/permissions/:resource', requireAuth, (req, res) => {
-  const { id, resource } = req.params;
-  
-  if (!state.userPermissions?.[id]) {
-    return res.status(404).json({ error: 'User permissions not found' });
+// ✅ NOW USING PRISMA
+app.delete('/api/members/:id/permissions/:permission', requireAuth, async (req, res) => {
+  try {
+    const { id, permission } = req.params;
+    
+    // Get current permissions
+    const member = await prisma.members.findUnique({
+      where: { id },
+      select: { permissions: true }
+    });
+    
+    if (!member) return res.status(404).json({ error: 'Member not found' });
+    
+    const currentPerms = member.permissions || [];
+    const newPerms = currentPerms.filter(p => p !== permission);
+    
+    // Update member
+    const updated = await prisma.members.update({
+      where: { id },
+      data: { permissions: newPerms }
+    });
+    
+    res.json({ 
+      ok: true, 
+      message: 'Permission supprimée',
+      member: updated
+    });
+  } catch (e) {
+    console.error('❌ Error deleting permission:', e.message);
+    res.status(500).json({ error: e.message });
   }
-  
-  state.userPermissions[id].permissions = state.userPermissions[id].permissions.filter(
-    p => p.resource !== resource
-  );
-  state.userPermissions[id].lastModified = new Date().toISOString();
-  
-  debouncedSave();
-  res.json({ 
-    ok: true, 
-    message: 'Permission supprimée',
-    userPermissions: state.userPermissions[id]
-  });
 });
 
 // PERMISSIONS ENDPOINT - Lookup user role and permissions by memberId or userId
-// Must come BEFORE the /api/user-permissions/:id endpoint with requireAuth
-// because Express matches routes in order and both patterns match
-app.get('/api/user-permissions/:userId', (req, res) => {
-  const userId = req.params.userId;
-  console.log(`🔍 Recherche permissions pour userId: ${userId}`);
-  
-  // Try direct lookup first (if userId is a site_users ID)
-  let userPerms = state.userPermissions[userId];
-  let siteUser = null;
-  
-  // If not found, try to find via linkedMemberId in site_users
-  // This handles the case where userId is a memberId
-  if (!userPerms && state.siteUsers) {
-    console.log(`   🔄 Recherche dans site_users avec linkedMemberId...`);
-    siteUser = state.siteUsers.find(u => u.linkedMemberId === userId);
-    if (siteUser) {
-      console.log(`   ✅ Trouvé site_user: ${siteUser.id}`);
-      userPerms = state.userPermissions[siteUser.id];
+// ✅ NOW USING PRISMA - Get permissions from members.permissions + user_permissions table
+app.get('/api/user-permissions/:userId', async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    console.log(`🔍 GET /api/user-permissions/:userId - ${userId}`);
+    
+    // Try to find member first (userId might be memberId)
+    const member = await prisma.members.findFirst({
+      where: {
+        OR: [
+          { id: userId },
+          { email: userId }
+        ]
+      }
+    });
+    
+    if (!member) {
+      console.log(`   ❌ Member not found for userId: ${userId}`);
+      return res.json({ permissions: [], role: 'MEMBER' });
     }
+    
+    // Get permissions from member object
+    const memberPermissions = member.permissions || [];
+    console.log(`   ✅ Found member: ${member.email}, permissions: ${memberPermissions.length}`);
+    
+    // Try to find site_user to get role
+    const siteUser = await prisma.site_users.findFirst({
+      where: { linkedMemberId: member.id }
+    });
+    
+    const role = siteUser?.role || 'MEMBER';
+    
+    res.json({ 
+      permissions: memberPermissions, 
+      role, 
+      memberId: member.id,
+      email: member.email
+    });
+  } catch (e) {
+    console.error('❌ Error in /api/user-permissions:', e.message);
+    res.status(500).json({ error: e.message });
   }
-  
-  // If no permissions found, return empty with MEMBER role
-  if (!userPerms || !userPerms.permissions || userPerms.permissions.length === 0) {
-    console.log(`   ❌ Aucune permission trouvée - rôle par défaut: MEMBER`);
-    return res.json({ permissions: [], role: 'MEMBER' });
-  }
-  
-  // Build permissions array with resource + actions
-  const permissions = userPerms.permissions.map(p => ({
-    resource: p.resource,
-    actions: p.actions
-  }));
-  
-  // Determine role from permissions: if has ADMIN action in any resource, role is ADMIN
-  const hasAdminPerms = userPerms.permissions.some(p => 
-    p.actions.includes('ADMIN') || p.resource === 'admin'
-  );
-  
-  const role = siteUser?.role || (hasAdminPerms ? 'ADMIN' : 'MEMBER');
-  
-  console.log(`   ✅ Permissions trouvées: ${permissions.length}, rôle: ${role}`);
-  
-  res.json({ permissions, role });
 });
 
 // GET all user permissions (admin endpoint)
-app.get('/api/user-permissions', requireAuth, (req, res) => {
-  const allPerms = Object.values(state.userPermissions || {});
-  res.json(allPerms);
+app.get('/api/user-permissions', requireAuth, async (req, res) => {
+  try {
+    const allMembers = await prisma.members.findMany({
+      select: { id: true, email: true, firstName: true, lastName: true, permissions: true }
+    });
+    
+    res.json(allMembers);
+  } catch (e) {
+    console.error('❌ Error fetching all user permissions:', e.message);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // DOCUMENTS
-app.get('/api/documents/member/:memberId', requireAuth, (req, res) => {
-  const list = state.documents.filter(d => d.memberId === req.params.memberId);
-  res.json({ documents: list });
+app.get('/api/documents/member/:memberId', requireAuth, async (req, res) => {
+  try {
+    const documents = await prisma.document.findMany({
+      where: { memberId: req.params.memberId }
+    });
+    res.json({ documents });
+  } catch (e) {
+    console.error('❌ Error fetching documents:', e.message);
+    res.status(500).json({ error: e.message });
+  }
 });
 app.delete('/api/documents/:id', requireAuth, (req, res) => {
   state.documents = state.documents.filter(d => d.id !== req.params.id);
