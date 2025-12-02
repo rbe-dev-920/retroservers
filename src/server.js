@@ -668,20 +668,25 @@ app.post(['/auth/member-login','/api/auth/member-login'], (req, res) => {
   const { identifier, password } = req.body || {};
   if (!identifier || !password) return res.status(400).json({ error: 'identifier & password requis' });
   
-  // Try to find member by email or firstName.toLowerCase() or lastName.toLowerCase()
-  let member = state.members.find(m => 
-    m.email === identifier || 
-    m.email?.toLowerCase().startsWith(identifier.toLowerCase()) ||
-    `${m.firstName || ''}${m.lastName || ''}`.toLowerCase().includes(identifier.toLowerCase())
-  );
+  // Try to find member by email (exact or partial), or firstname+lastname
+  let member = state.members.find(m => {
+    const id = identifier.toLowerCase();
+    const email = m.email?.toLowerCase() || '';
+    const fullName = `${m.firstName || ''}${m.lastName || ''}`.toLowerCase();
+    
+    // Exact email match
+    if (email === id) return true;
+    // Partial email match: identifier matches beginning of email (w.belaidi matches w.belaidi@...)
+    if (email.startsWith(id)) return true;
+    // Or if identifier includes @, try exact email
+    if (id.includes('@') && email === id) return true;
+    // Or full name match
+    if (fullName.includes(id)) return true;
+    
+    return false;
+  });
   
-  // If not found and identifier looks like email format, return error
-  if (!member && identifier.includes('@')) {
-    return res.status(401).json({ error: 'Identifiants invalides' });
-  }
-  
-  // For development: accept any identifier found in database with any password
-  // (password validation would require hashed passwords in database)
+  // If not found, return error
   if (!member) return res.status(401).json({ error: 'Identifiants invalides' });
   
   // Find user's role from site_users via linkedMemberId
