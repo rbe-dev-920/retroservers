@@ -650,6 +650,28 @@ app.post(['/api/notifications/:id/read','/notifications/:id/read'], requireAuth,
   res.json({ notification: n });
 });
 
+// ===== RETROMAIL (stub endpoints) =====
+app.get(['/retromail/list'], requireAuth, (req, res) => {
+  // Retourne une liste vide de fiches retromail
+  res.json([]);
+});
+
+app.get(['/retromail/:filename'], requireAuth, (req, res) => {
+  // Retourne une fiche retromail vide
+  res.json({
+    id: req.params.filename,
+    parc: 'N/A',
+    description: 'Fiche non trouvée',
+    createdAt: new Date().toISOString()
+  });
+});
+
+app.get(['/retromail/:filename.pdf'], requireAuth, (req, res) => {
+  // Retourne un PDF vide
+  res.setHeader('Content-Type', 'application/pdf');
+  res.send(Buffer.from('%PDF-1.4\n', 'utf8'));
+});
+
 // VEHICLES - PRISMA avec fallback// ⛔ ENDPOINT DÉPLACÉ avec fallback mémoire (voir ligne ~1390)
 // app.get(['/vehicles','/api/vehicles'], requireAuth, async (req, res) => {
 //   try {
