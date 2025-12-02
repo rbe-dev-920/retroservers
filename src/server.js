@@ -1517,9 +1517,15 @@ app.delete(['/vehicles/:parc/echancier/:id','/api/vehicles/:parc/echancier/:id']
 // RETRO REQUESTS & NEWS (RetroAssistant, RétroDemandes)
 app.get(['/api/retro-requests'], requireAuth, async (req, res) => {
   try {
+    // Get member by email to get real ID
+    const member = await prisma.members.findUnique({ where: { email: req.user.email } });
+    if (!member) {
+      return res.status(404).json({ error: 'Member not found' });
+    }
+    
     // Get user's retro requests from Prisma
     const requests = await prisma.retro_request.findMany({
-      where: { userId: req.user.id },
+      where: { userId: member.id },
       orderBy: { createdAt: 'desc' },
       include: {
         retro_request_file: true,
@@ -1535,8 +1541,8 @@ app.get(['/api/retro-requests'], requireAuth, async (req, res) => {
 
 app.get(['/api/retro-requests/admin/all'], requireAuth, async (req, res) => {
   try {
-    // Check if user has ADMIN role
-    const member = await prisma.members.findUnique({ where: { id: req.user.id } });
+    // Check if user has ADMIN role - lookup by email
+    const member = await prisma.members.findUnique({ where: { email: req.user.email } });
     const isAdmin = member?.role === 'ADMIN';
     
     if (!isAdmin) {
@@ -1566,8 +1572,8 @@ app.post(['/api/retro-requests'], requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Title and description are required' });
     }
     
-    // Get user info
-    const member = await prisma.members.findUnique({ where: { id: req.user.id } });
+    // Get user info by email
+    const member = await prisma.members.findUnique({ where: { email: req.user.email } });
     if (!member) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -1575,7 +1581,7 @@ app.post(['/api/retro-requests'], requireAuth, async (req, res) => {
     const request = await prisma.retro_request.create({
       data: {
         id: Math.random().toString(36).substr(2, 9),
-        userId: req.user.id,
+        userId: member.id,
         userName: `${member.firstName} ${member.lastName}`,
         userEmail: member.email,
         title,
@@ -1605,10 +1611,10 @@ app.put(['/api/retro-requests/:id'], requireAuth, async (req, res) => {
       return res.status(404).json({ error: 'Request not found' });
     }
     
-    // Only allow user to edit their own requests or admins to edit all
-    const member = await prisma.members.findUnique({ where: { id: req.user.id } });
+    // Only allow user to edit their own requests or admins to edit all - lookup by email
+    const member = await prisma.members.findUnique({ where: { email: req.user.email } });
     const isAdmin = member?.role === 'ADMIN';
-    if (request.userId !== req.user.id && !isAdmin) {
+    if (request.userId !== member.id && !isAdmin) {
       return res.status(403).json({ error: 'Not authorized' });
     }
     
@@ -1640,10 +1646,10 @@ app.delete(['/api/retro-requests/:id'], requireAuth, async (req, res) => {
       return res.status(404).json({ error: 'Request not found' });
     }
     
-    // Only allow user to delete their own requests or admins to delete all
-    const member = await prisma.members.findUnique({ where: { id: req.user.id } });
+    // Only allow user to delete their own requests or admins to delete all - lookup by email
+    const member = await prisma.members.findUnique({ where: { email: req.user.email } });
     const isAdmin = member?.role === 'ADMIN';
-    if (request.userId !== req.user.id && !isAdmin) {
+    if (request.userId !== member.id && !isAdmin) {
       return res.status(403).json({ error: 'Not authorized' });
     }
     
