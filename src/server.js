@@ -2171,7 +2171,8 @@ app.post('/api/admin/users', requireAuth, async (req, res) => {
         role: role || 'USER',
         status: 'active',
         permissions: [],
-        createdAt: new Date()
+        createdAt: new Date(),
+        updatedAt: new Date()
       }
     });
     
