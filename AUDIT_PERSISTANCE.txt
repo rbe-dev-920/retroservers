@@ -1,0 +1,102 @@
+// AUDIT COMPLET : ZONES MANQUANT PERSISTANCE PRISMA
+
+/**
+ * ❌ ZONES CRITIQUES SANS PERSISTANCE (State-only)
+ */
+
+// 1. user_permissions / userPermissions
+// - Ligne 1839: state.userPermissions[id] = { ... }
+// - Ligne 1755: state.userPermissions[id] = { ... }
+// ✅ SOLUTION: Utiliser la colonne 'permissions' dans membres + table user_permissions en Prisma
+
+// 2. vehicleCarteGrise (CG) 
+// - Ligne 2836+: Endpoints GET/PUT utilisant Prisma ✅ OK
+
+// 3. vehicleAssurance
+// - Endpoints utilisant Prisma ✅ OK
+
+// 4. vehicleControleTechnique
+// - Table VehicleControlTechnique existe en Prisma ✅ OK
+
+// 5. vehicleCertificatCession
+// - Table VehicleCessionCertificate créée ✅ OK (juste fixé)
+
+// 6. vehicleEchancier / scheduled operations
+// - Ligne 1435+: State-only, debouncedSave()
+// - ❌ MANQUE: Table Prisma + endpoints Prisma
+// - ✅ EXISTE: scheduled_operations table en Prisma
+
+// 7. retroNews / Flash
+// - Endpoints GET en Prisma ✅ OK
+// - POST/PUT pas vérifiés
+
+// 8. Events
+// - Endpoints GET en Prisma ✅ OK
+// - POST/PUT utilisant state.events ❌ À vérifier
+
+// 9. Members
+// - /api/members GET/POST/DELETE utilisant Prisma ✅ OK
+// - Mais state.members aussi utilisé pour lookups
+
+// 10. Site Users
+// - state.siteUsers utilisé pour lookups
+// - Table site_users existe en Prisma
+// - Endpoints ? À vérifier
+
+/**
+ * ENDPOINTS CRITIQUES À AUDITER/FIXER
+ */
+
+PROBLÈMES_IDENTIFIÉS = [
+  {
+    zone: 'user-permissions',
+    problème: 'GET /api/user-permissions/:id stocké en state seulement',
+    ligne: '1839',
+    solution: 'Utiliser Prisma user_permissions + members.permissions'
+  },
+  {
+    zone: 'vehicleEchancier',
+    problème: 'GET/POST /vehicles/:parc/echancier en state, pas en Prisma',
+    ligne: '1435',
+    solution: 'Migrer vers scheduled_operations en Prisma'
+  },
+  {
+    zone: 'events',
+    problème: 'Events POST/PUT/DELETE utilisent state.events, pas Prisma',
+    ligne: '800+',
+    solution: 'Utiliser Prisma Event model'
+  },
+  {
+    zone: 'retroNews',
+    problème: 'POST/PUT pour actualités peuvent utiliser state',
+    ligne: '2100+',
+    solution: 'Vérifier endpoints, utiliser Prisma RetroNews'
+  },
+  {
+    zone: 'Flash',
+    problème: 'Flash messages stockées en state',
+    ligne: '2000+',
+    solution: 'Utiliser Prisma Flash model'
+  },
+  {
+    zone: 'siteUsers',
+    problème: 'state.siteUsers utilisé pour lookups role',
+    ligne: '715, 724',
+    solution: 'Utiliser Prisma site_users pour lookups'
+  }
+];
+
+/**
+ * PRIORISATION
+ */
+
+PRIORITÉ_HAUTE = [
+  '1. user-permissions → Utilisé dans /api/user-permissions/:id (TU L\'UTILISES!)',
+  '2. vehicleEchancier → Données importantes de maintenance',
+  '3. events POST/PUT → Données métier importantes'
+];
+
+PRIORITÉ_MOYENNE = [
+  '4. siteUsers lookups → Amélioration performance + persistance',
+  '5. retroNews/Flash POST → Données éditoriales'
+];
