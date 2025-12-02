@@ -1086,7 +1086,7 @@ app.post(['/vehicles/:parc/usages/:id/end','/api/vehicles/:parc/usages/:id/end']
 // Maintenance - PRISMA avec fallback
 app.get(['/vehicles/:parc/maintenance','/api/vehicles/:parc/maintenance'], requireAuth, async (req, res) => {
   try {
-    const maintenance = await prisma.vehicleMaintenance.findMany({
+    const maintenance = await prisma.vehicle_maintenance.findMany({
       where: { parc: req.params.parc },
       orderBy: { date: 'desc' }
     });
@@ -1099,7 +1099,7 @@ app.get(['/vehicles/:parc/maintenance','/api/vehicles/:parc/maintenance'], requi
 
 app.post(['/vehicles/:parc/maintenance','/api/vehicles/:parc/maintenance'], requireAuth, async (req, res) => {
   try {
-    const item = await prisma.vehicleMaintenance.create({
+    const item = await prisma.vehicle_maintenance.create({
       data: {
         parc: req.params.parc,
         type: req.body?.type,
@@ -1119,7 +1119,7 @@ app.post(['/vehicles/:parc/maintenance','/api/vehicles/:parc/maintenance'], requ
 // Service schedule - PRISMA avec fallback
 app.get(['/vehicles/:parc/service-schedule','/api/vehicles/:parc/service-schedule'], requireAuth, async (req, res) => {
   try {
-    const schedule = await prisma.vehicleServiceSchedule.findMany({
+    const schedule = await prisma.vehicle_service_schedule.findMany({
       where: { parc: req.params.parc },
       orderBy: { plannedDate: 'asc' }
     });
@@ -1132,7 +1132,7 @@ app.get(['/vehicles/:parc/service-schedule','/api/vehicles/:parc/service-schedul
 
 app.post(['/vehicles/:parc/service-schedule','/api/vehicles/:parc/service-schedule'], requireAuth, async (req, res) => {
   try {
-    const item = await prisma.vehicleServiceSchedule.create({
+    const item = await prisma.vehicle_service_schedule.create({
       data: {
         parc: req.params.parc,
         serviceType: req.body?.serviceType,
@@ -1155,8 +1155,8 @@ app.post(['/vehicles/:parc/service-schedule','/api/vehicles/:parc/service-schedu
 app.get(['/vehicles/:parc/maintenance-summary','/api/vehicles/:parc/maintenance-summary'], requireAuth, async (req, res) => {
   try {
     const parc = req.params.parc;
-    const maintenance = await prisma.vehicleMaintenance.findMany({ where: { parc } });
-    const schedule = await prisma.vehicleServiceSchedule.findMany({ where: { parc } });
+    const maintenance = await prisma.vehicle_maintenance.findMany({ where: { parc } });
+    const schedule = await prisma.vehicle_service_schedule.findMany({ where: { parc } });
     
     const totalCost = maintenance.reduce((s, m) => s + (m.cost || 0), 0);
     const maintenanceCount = maintenance.length;
