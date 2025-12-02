@@ -326,27 +326,6 @@ const requireAuth = (req, res, next) => {
 // Health & version
 app.get(['/api/health','/health'], (req, res) => res.json({ ok: true, time: new Date().toISOString(), version: 'rebuild-1' }));
 
-// Debug endpoint - vérifier les données chargées
-app.get(['/api/debug/state', '/debug/state'], (req, res) => {
-  res.json({
-    members: state.members.length,
-    vehicles: state.vehicles.length,
-    events: state.events.length,
-    retroNews: state.retroNews.length,
-    flashes: state.flashes.length,
-    transactions: state.transactions.length,
-    expenseReports: state.expenseReports.length,
-    documents: state.documents.length,
-    devisLines: state.devisLines.length,
-    quoteTemplates: state.quoteTemplates.length,
-    financialDocuments: state.financialDocuments.length,
-    vehicleMaintenance: state.vehicleMaintenance.length,
-    vehicleServiceSchedule: state.vehicleServiceSchedule.length,
-    bankBalance: state.bankBalance,
-    categories: state.categories.length
-  });
-});
-
 // AUTH
 app.post(['/auth/login','/api/auth/login'], (req, res) => {
   const { email, password } = req.body || {};
