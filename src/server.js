@@ -23,17 +23,17 @@ const pathRoot = process.cwd();
 let pgClient = null;
 let pgAvailable = false;
 let postgresDataImported = false;  // Flag pour tracker si import déjà fait
-const LOAD_FROM_BACKUP = true;  // ✅ Charger depuis backup au lieu de PostgreSQL
+// ✅ À DÉMARRAGE: Charger depuis Prisma (pas depuis backup)
+const LOAD_FROM_BACKUP = false;  // ❌ Désactivé - on charge depuis Prisma maintenant
 
 // Déterminer si on est sur Railway
 const isRailway = process.env.RAILWAY_ENVIRONMENT_NAME !== undefined;
 
 // Try to load pg package dynamically
 async function initPgClient() {
-  // ✅ Mode local-only: désactiver PostgreSQL et utiliser uniquement les backups
-  // Cela évite les conflits de synchronisation entre DB et serveur en mémoire
-  console.log('📦 Mode LOCAL - Données serveur chargées depuis backup JSON');
-  console.log('⚠️  PostgreSQL DÉSACTIVÉ - Les écritures ne persistent pas à chaque redémarrage');
+  // ✅ Mode NORMAL: charger depuis Prisma (database), pas de backup automatique
+  console.log('📦 Mode NORMAL - Données serveur chargées depuis Prisma/SQLite');
+  console.log('✅ PostgreSQL/Prisma ACTIVÉ - Les écritures persistent directement');
   pgAvailable = false;
   return;
   
@@ -317,10 +317,11 @@ function saveStateToBackup() {
   }
 }
 
-// Fonction debounce pour éviter trop d'écritures disque
+// Fonction debounce - DÉSACTIVÉE (pas de sauvegarde automatique)
 function debouncedSave() {
-  clearTimeout(saveDebounceTimer);
-  saveDebounceTimer = setTimeout(saveStateToBackup, 500);
+  // ❌ Plus de sauvegarde automatique
+  // Les données restent en mémoire jusqu'au redémarrage du serveur
+  // L'utilisateur fait les backups manuellement s'il veut les conserver
 }
 
 // Function to load data from backup
