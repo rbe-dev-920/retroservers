@@ -1551,53 +1551,124 @@ app.delete(['/api/retro-news/:id'], requireAuth, (req, res) => {
 });
 
 // MEMBERS
-app.get(['/api/members','/members'], requireAuth, (req, res) => {
-  const limit = Number(req.query.limit || state.members.length);
-  return res.json({ members: state.members.slice(0, limit) });
+app.get(['/api/members','/members'], requireAuth, async (req, res) => {
+  try {
+    const limit = Number(req.query.limit) || undefined;
+    const members = await prisma.members.findMany({ take: limit });
+    return res.json({ members });
+  } catch (e) {
+    console.error('❌ Error fetching members:', e.message);
+    res.status(500).json({ error: 'Failed to fetch members' });
+  }
 });
 app.get(['/api/members/me'], requireAuth, (req, res) => {
   // stub current member from token
   const m = state.members[0] || null;
   return res.json({ member: m });
 });
-app.post(['/api/members','/members'], requireAuth, (req, res) => {
-  const member = { id: uid(), status: 'active', createdAt: new Date().toISOString(), ...req.body };
-  state.members.push(member);
-  debouncedSave();
-  res.status(201).json({ member });
+app.post(['/api/members','/members'], requireAuth, async (req, res) => {
+  try {
+    const member = await prisma.members.create({
+      data: {
+        id: uid(),
+        ...req.body,
+        status: req.body.status || 'active',
+        firstName: req.body.firstName || '',
+        lastName: req.body.lastName || '',
+        email: req.body.email,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }
+    });
+    state.members.push(member);
+    debouncedSave();
+    res.status(201).json({ member });
+  } catch (e) {
+    console.error('❌ Error creating member:', e.message);
+    res.status(500).json({ error: 'Failed to create member', details: e.message });
+  }
 });
-app.put(['/api/members','/members'], requireAuth, (req, res) => {
-  const { id } = req.body;
-  state.members = state.members.map(m => m.id === id ? { ...m, ...req.body, updatedAt: new Date().toISOString() } : m);
-  const member = state.members.find(m => m.id === id);
-  debouncedSave();
-  console.log(`✅ Adhérent ${id} modifié et sauvegardé`);
-  res.json({ member });
+app.put(['/api/members','/members'], requireAuth, async (req, res) => {
+  try {
+    const { id } = req.body;
+    const member = await prisma.members.update({
+      where: { id },
+      data: { ...req.body, updatedAt: new Date() }
+    });
+    const stateIdx = state.members.findIndex(m => m.id === id);
+    if (stateIdx !== -1) state.members[stateIdx] = member;
+    debouncedSave();
+    console.log(`✅ Adhérent ${id} modifié et sauvegardé`);
+    res.json({ member });
+  } catch (e) {
+    console.error('❌ Error updating member:', e.message);
+    res.status(500).json({ error: 'Failed to update member', details: e.message });
+  }
 });
-app.patch(['/api/members','/members'], requireAuth, (req, res) => {
-  const { id } = req.body;
-  state.members = state.members.map(m => m.id === id ? { ...m, ...req.body, updatedAt: new Date().toISOString() } : m);
-  const member = state.members.find(m => m.id === id);
-  debouncedSave();
-  console.log(`✅ Adhérent ${id} patchié et sauvegardé`);
-  res.json({ member });
+app.patch(['/api/members','/members'], requireAuth, async (req, res) => {
+  try {
+    const { id } = req.body;
+    const member = await prisma.members.update({
+      where: { id },
+      data: { ...req.body, updatedAt: new Date() }
+    });
+    const stateIdx = state.members.findIndex(m => m.id === id);
+    if (stateIdx !== -1) state.members[stateIdx] = member;
+    debouncedSave();
+    console.log(`✅ Adhérent ${id} patchié et sauvegardé`);
+    res.json({ member });
+  } catch (e) {
+    console.error('❌ Error patching member:', e.message);
+    res.status(500).json({ error: 'Failed to patch member', details: e.message });
+  }
 });
-app.delete(['/api/members','/members'], requireAuth, (req, res) => {
-  const { id } = req.body;
-  state.members = state.members.filter(m => m.id !== id);
-  debouncedSave();
-  console.log(`✅ Adhérent ${id} supprimé et sauvegardé`);
-  res.json({ ok: true });
+app.delete(['/api/members','/members'], requireAuth, async (req, res) => {
+  try {
+    const { id } = req.body;
+    
+    // Delete from Prisma (single source of truth)
+    const deleted = await prisma.members.delete({
+      where: { id }
+    });
+    
+    // Also remove from state.members
+    state.members = state.members.filter(m => m.id !== id);
+    debouncedSave();
+    
+    console.log(`✅ Adhérent ${id} supprimé de Prisma et mémoire`);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('❌ Error deleting member:', e.message);
+    res.status(500).json({ error: 'Failed to delete member', details: e.message });
+  }
 });
 app.post('/api/members/change-password', requireAuth, (req, res) => {
   res.json({ ok: true });
 });
-app.post('/api/members/:id/terminate', requireAuth, (req, res) => {
-  const { id } = req.params;
-  state.members = state.members.map(m => m.id === id ? { ...m, status: 'terminated', updatedAt: new Date().toISOString() } : m);
-  debouncedSave();
-  console.log(`✅ Adhérent ${id} terminé et sauvegardé`);
-  res.json({ ok: true });
+app.post('/api/members/:id/terminate', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Update in Prisma
+    const updated = await prisma.members.update({
+      where: { id },
+      data: { status: 'terminated', updatedAt: new Date() }
+    });
+    
+    // Also update in state.members
+    const member = state.members.find(m => m.id === id);
+    if (member) {
+      member.status = 'terminated';
+      member.updatedAt = new Date().toISOString();
+    }
+    
+    debouncedSave();
+    console.log(`✅ Adhérent ${id} terminé dans Prisma et mémoire`);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('❌ Error terminating member:', e.message);
+    res.status(500).json({ error: 'Failed to terminate member', details: e.message });
+  }
 });
 app.post('/api/members/:id/link-access', requireAuth, (req, res) => {
   const { id } = req.params;
@@ -1625,39 +1696,43 @@ app.post('/api/members/:id/link-access', requireAuth, (req, res) => {
 
 // GET member permissions
 // MEMBERS endpoints
-app.get('/api/members/:id', requireAuth, (req, res) => {
-  const member = state.members.find(m => m.id === req.params.id);
-  if (!member) {
-    return res.status(404).json({ error: 'Member not found' });
+app.get('/api/members/:id', requireAuth, async (req, res) => {
+  try {
+    const member = await prisma.members.findUnique({
+      where: { id: req.params.id }
+    });
+    if (!member) {
+      return res.status(404).json({ error: 'Member not found' });
+    }
+    res.json(member);
+  } catch (e) {
+    console.error('❌ Error fetching member:', e.message);
+    res.status(500).json({ error: 'Failed to fetch member', details: e.message });
   }
-  res.json(member);
 });
 
 // PUT /api/members/:id - Update member
-app.put(['/api/members/:id', '/members/:id'], requireAuth, (req, res) => {
-  const { id } = req.params;
-  const memberIndex = state.members.findIndex(m => m.id === id);
-  
-  if (memberIndex === -1) {
-    return res.status(404).json({ error: 'Member not found' });
+app.put(['/api/members/:id', '/members/:id'], requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Update in Prisma
+    const updatedMember = await prisma.members.update({
+      where: { id },
+      data: { ...req.body, updatedAt: new Date() }
+    });
+    
+    // Also update in state
+    const stateIdx = state.members.findIndex(m => m.id === id);
+    if (stateIdx !== -1) state.members[stateIdx] = updatedMember;
+    
+    debouncedSave();
+    console.log(`✅ Adhérent ${id} mis à jour et sauvegardé`);
+    res.json({ success: true, member: updatedMember });
+  } catch (e) {
+    console.error('❌ Error updating member:', e.message);
+    res.status(500).json({ error: 'Failed to update member', details: e.message });
   }
-  
-  // Update member with provided data
-  const updatedMember = {
-    ...state.members[memberIndex],
-    ...req.body,
-    id: id, // Don't allow changing ID
-    updatedAt: new Date().toISOString()
-  };
-  
-  state.members[memberIndex] = updatedMember;
-  
-  // ✅ Sauvegarder les changements en persistant le backup
-  debouncedSave();
-  
-  console.log(`✅ Adhérent ${id} mis à jour et sauvegardé`);
-  
-  res.json({ success: true, member: updatedMember });
 });
 
 app.get('/api/members/:id/permissions', requireAuth, (req, res) => {
