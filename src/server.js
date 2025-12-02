@@ -8,8 +8,8 @@ import { fileURLToPath } from 'url';
 import { PrismaClient } from '@prisma/client';
 
 const __filename = fileURLToPath(import.meta.url);
-  const events = normalizeEventCollection((state.events || []).filter(e => e.status === 'PUBLISHED'));
-  res.json(events);
+const __dirname = path.dirname(__filename);
+
 dotenv.config();
 
 // ============================================================
