@@ -960,7 +960,7 @@ app.get(['/retromail/:filename.pdf'], requireAuth, (req, res) => {
 
 app.put(['/vehicles/:parc','/api/vehicles/:parc'], requireAuth, async (req, res) => {
   const prismaData = buildPrismaVehicleUpdateData(req.body || {});
-  const canUsePrisma = prismaAvailable && prisma && Object.keys(prismaData).length > 0;
+  const canUsePrisma = prisma && Object.keys(prismaData).length > 0;
 
   if (canUsePrisma) {
     try {
@@ -1756,7 +1756,7 @@ app.get('/api/documents/:id/download', requireAuth, (req, res) => {
 
 // EVENTS - PRISMA avec fallback optionnel
 app.get(['/events', '/api/events'], requireAuth, async (req, res) => {
-  if (prismaAvailable && prisma) {
+  if (prisma) {
     try {
       const events = await prisma.event.findMany({ orderBy: { date: 'desc' } });
       return res.json({ events });
@@ -1772,7 +1772,7 @@ app.get(['/events', '/api/events'], requireAuth, async (req, res) => {
 });
 
 app.get(['/events/:id', '/api/events/:id'], requireAuth, async (req, res) => {
-  if (prismaAvailable && prisma) {
+  if (prisma) {
     try {
       const event = await prisma.event.findUnique({ where: { id: req.params.id } });
       if (!event) return res.status(404).json({ error: 'Not found' });
@@ -1792,7 +1792,7 @@ app.get(['/events/:id', '/api/events/:id'], requireAuth, async (req, res) => {
 
 // VEHICLES - PRISMA avec fallback optionnel
 app.get(['/vehicles', '/api/vehicles'], requireAuth, async (req, res) => {
-  if (prismaAvailable && prisma) {
+  if (prisma) {
     try {
       const vehicles = await prisma.vehicle.findMany({ orderBy: { parc: 'asc' } });
       return res.json({ vehicles });
@@ -1807,7 +1807,7 @@ app.get(['/vehicles', '/api/vehicles'], requireAuth, async (req, res) => {
 });
 
 app.get(['/vehicles/:parc', '/api/vehicles/:parc'], requireAuth, async (req, res) => {
-  if (prismaAvailable && prisma) {
+  if (prisma) {
     try {
       const idCandidate = Number(req.params.parc);
       const filters = [{ parc: req.params.parc }];
@@ -1845,7 +1845,7 @@ app.post(['/events', '/api/events'], requireAuth, async (req, res) => {
     }
   }
 
-  const prismaOnline = prismaAvailable && prisma;
+  const prismaOnline = prisma;
   if (prismaOnline) {
     try {
       const event = await prisma.event.create({ data: basePayload });
@@ -1879,7 +1879,7 @@ app.post(['/events', '/api/events'], requireAuth, async (req, res) => {
 
 app.put(['/events/:id', '/api/events/:id'], requireAuth, async (req, res) => {
   const prismaData = buildPrismaEventUpdateData(req.body || {});
-  const canUsePrisma = prismaAvailable && prisma && Object.keys(prismaData).length > 0;
+  const canUsePrisma = prisma && Object.keys(prismaData).length > 0;
 
   if (canUsePrisma) {
     try {
@@ -1918,7 +1918,7 @@ app.put(['/events/:id', '/api/events/:id'], requireAuth, async (req, res) => {
 });
 
 app.delete(['/events/:id', '/api/events/:id'], requireAuth, async (req, res) => {
-  const prismaOnline = prismaAvailable && prisma;
+  const prismaOnline = prisma;
   if (prismaOnline) {
     try {
       await prisma.event.delete({
@@ -2778,7 +2778,7 @@ app.listen(PORT, async () => {
 // Utilitaire pour déconnecter Prisma proprement
 async function safeDisconnectPrisma() {
   try {
-    if (prisma && prismaAvailable && typeof prisma.$disconnect === 'function') {
+    if (prisma && typeof prisma.$disconnect === 'function') {
       await prisma.$disconnect();
       console.log('🔌 Prisma déconnecté proprement');
     } else {
