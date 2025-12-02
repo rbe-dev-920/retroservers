@@ -8,8 +8,8 @@ import { fileURLToPath } from 'url';
 import { PrismaClient } from '@prisma/client';
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
+  const events = normalizeEventCollection((state.events || []).filter(e => e.status === 'PUBLISHED'));
+  res.json(events);
 dotenv.config();
 
 // ============================================================
@@ -103,12 +103,131 @@ const state = {
 // Catégories financières par défaut (en mémoire car rarement modifiées)
 const defaultCategories = state.categories;
 
+const backupsDir = path.join(pathRoot, 'backups');
+const runtimeStatePath = path.join(backupsDir, 'runtime-state.json');
+
+const ensureDirectoryExists = (dirPath) => {
+  if (!fs.existsSync(dirPath)) {
+    fs.mkdirSync(dirPath, { recursive: true });
+  }
+};
+
+const persistStateToDisk = () => {
+  try {
+    ensureDirectoryExists(path.dirname(runtimeStatePath));
+    fs.writeFileSync(runtimeStatePath, JSON.stringify({
+      savedAt: new Date().toISOString(),
+      state
+    }, null, 2), 'utf-8');
+  } catch (error) {
+    console.warn('⚠️  Impossible de sauvegarder l\'état en mémoire:', error.message);
+  }
+};
+
+let stateSaveTimer = null;
+const debouncedSave = () => {
+  if (stateSaveTimer) clearTimeout(stateSaveTimer);
+  stateSaveTimer = setTimeout(persistStateToDisk, 750);
+};
+
+const normalizeExtrasValue = (extras) => {
+  if (extras === undefined) return undefined;
+  if (extras === null) return null;
+  if (typeof extras === 'string') return extras;
+  try {
+    return JSON.stringify(extras);
+  } catch (error) {
+    console.warn('⚠️  Impossible de sérialiser extras:', error.message);
+    return null;
+  }
+};
+
+const normalizeEventExtras = (event = {}) => {
+  if (!event || typeof event !== 'object') return event;
+  const normalized = { ...event };
+  if (Object.prototype.hasOwnProperty.call(normalized, 'extras')) {
+    const normalizedExtras = normalizeExtrasValue(normalized.extras);
+    if (normalizedExtras === undefined) {
+      delete normalized.extras;
+    } else {
+      normalized.extras = normalizedExtras;
+    }
+  }
+  return normalized;
+};
+
+const normalizeEventCollection = (events = []) => events.map(ev => normalizeEventExtras(ev));
+
+const prismaEventFieldAllowList = new Set(['title', 'description', 'date', 'status', 'extras']);
+
+const buildPrismaEventUpdateData = (payload = {}) => {
+  if (!payload || typeof payload !== 'object') return {};
+  const normalized = normalizeEventExtras(payload);
+  const data = {};
+  prismaEventFieldAllowList.forEach((key) => {
+    if (Object.prototype.hasOwnProperty.call(normalized, key) && normalized[key] !== undefined) {
+      data[key] = normalized[key];
+    }
+  });
+  if (data.date) {
+    const parsedDate = new Date(data.date);
+    if (!Number.isNaN(parsedDate.getTime())) {
+      data.date = parsedDate;
+    } else {
+      delete data.date;
+    }
+  }
+  return data;
+};
+
+const buildStateEventUpdateData = (payload = {}) => {
+  if (!payload || typeof payload !== 'object') return {};
+  const normalized = normalizeEventExtras(payload);
+  if (normalized.date instanceof Date) {
+    normalized.date = normalized.date.toISOString();
+  } else if (normalized.date) {
+    const parsedDate = new Date(normalized.date);
+    if (!Number.isNaN(parsedDate.getTime())) {
+      normalized.date = parsedDate.toISOString();
+    }
+  }
+  return normalized;
+};
+
+const upsertEventInMemory = (event) => {
+  if (!event) return null;
+  if (!Array.isArray(state.events)) state.events = [];
+  const normalized = normalizeEventExtras(event);
+  const idx = state.events.findIndex(ev => ev.id === normalized.id);
+  if (idx === -1) {
+    state.events.push(normalized);
+    return normalized;
+  }
+  state.events[idx] = { ...state.events[idx], ...normalized };
+  return state.events[idx];
+};
+
+const updateEventInMemory = (eventId, updatePayload = {}) => {
+  if (!Array.isArray(state.events)) state.events = [];
+  const idx = state.events.findIndex(ev => ev.id === eventId);
+  if (idx === -1) return null;
+  const normalizedUpdate = normalizeEventExtras(updatePayload);
+  const merged = {
+    ...state.events[idx],
+    ...normalizedUpdate,
+    id: state.events[idx].id || eventId,
+    updatedAt: new Date().toISOString()
+  };
+  state.events[idx] = normalizeEventExtras(merged);
+  return state.events[idx];
+};
+
 // ============================================================
 // 💾 CHARGEMENT DU BACKUP AU DÉMARRAGE
 // ============================================================
 function loadBackupAtStartup() {
   try {
-    const backupDir = path.join(pathRoot, 'backups');
+    const backupDir = backupsDir;
     
     // D'abord, chercher restore-info.json
     let backupName = null;
@@ -167,7 +286,7 @@ function loadBackupAtStartup() {
       console.log(`   ✅ ${state.retroNews.length} actualités`);
     }
     if (tables.Event?.data) {
-      state.events = tables.Event.data;
+      state.events = normalizeEventCollection(tables.Event.data || []);
       console.log(`   ✅ ${state.events.length} événements`);
     }
     if (tables.Flash?.data) {
@@ -255,6 +374,7 @@ function loadBackupAtStartup() {
 
 // Charger le backup au démarrage
 loadBackupAtStartup();
+state.events = normalizeEventCollection(state.events || []);
 
 // CORS configuration - Allow frontend(s) and local dev
 const allowedOrigins = [
@@ -1468,31 +1588,16 @@ app.get('/api/documents/:id/download', requireAuth, (req, res) => {
   res.status(404).json({ error: 'Not implemented file storage' });
 });
 
-// EVENTS
-app.get(['/events', '/api/events'], requireAuth, (req, res) => {
-  res.json({ events: state.events });
-});
-app.get(['/events/:id', '/api/events/:id'], requireAuth, (req, res) => {
-  const ev = state.events.find(e => e.id === req.params.id);
-  if (!ev) return res.status(404).json({ error: 'Not found' });
-  res.json({ event: ev });
-});
 // EVENTS - MEMOIRE (fallback principal)
 app.get(['/events', '/api/events'], requireAuth, (req, res) => {
-  const events = (state.events || []).map(event => ({
-    ...event,
-    extras: typeof event.extras === 'string' ? event.extras : JSON.stringify(event.extras || {})
-  }));
+  const events = normalizeEventCollection(state.events || []);
   res.json({ events });
 });
 
 app.get(['/events/:id', '/api/events/:id'], requireAuth, (req, res) => {
   const event = (state.events || []).find(e => e.id === req.params.id);
   if (!event) return res.status(404).json({ error: 'Not found' });
-  const normalized = {
-    ...event,
-    extras: typeof event.extras === 'string' ? event.extras : JSON.stringify(event.extras || {})
-  };
+  const normalized = normalizeEventExtras(event);
   res.json({ event: normalized });
 });
 
@@ -1509,42 +1614,74 @@ app.get(['/vehicles/:parc', '/api/vehicles/:parc'], requireAuth, (req, res) => {
 
 // EVENTS CRUD - PRISMA avec fallback
 app.post(['/events', '/api/events'], requireAuth, async (req, res) => {
-  try {
-    const event = await prisma.event.create({
-      data: {
-        title: req.body.title || 'Nouvel événement',
-        description: req.body.description,
-        date: req.body.date ? new Date(req.body.date) : null,
-        status: req.body.status || 'DRAFT',
-        extras: req.body.extras ? JSON.stringify(req.body.extras) : null
-      }
-    });
-    console.log('✅ Event créé:', event.id, event.title);
-    res.status(201).json({ event });
-  } catch (e) {
-    console.error('Erreur POST /events (Prisma):', e.message);
-    res.status(500).json({ error: 'Database error' });
+  const basePayload = {
+    title: req.body.title || 'Nouvel événement',
+    description: req.body.description,
+    date: req.body.date ? new Date(req.body.date) : null,
+    status: req.body.status || 'DRAFT'
+  };
+
+  if (Object.prototype.hasOwnProperty.call(req.body || {}, 'extras')) {
+    const extrasValue = normalizeExtrasValue(req.body.extras);
+    if (extrasValue !== undefined) {
+      basePayload.extras = extrasValue;
+    }
   }
+
+  if (prismaAvailable && prisma) {
+    try {
+      const event = await prisma.event.create({ data: basePayload });
+      const synced = upsertEventInMemory(event) || event;
+      debouncedSave();
+      console.log('✅ Event créé:', event.id, event.title);
+      return res.status(201).json({ event: synced, source: 'prisma' });
+    } catch (e) {
+      console.error('Erreur POST /events (Prisma):', e.message);
+    }
+  }
+
+  const fallbackEventPayload = buildStateEventUpdateData({
+    id: req.body?.id || uid(),
+    ...req.body,
+    title: req.body?.title || basePayload.title,
+    status: req.body?.status || basePayload.status
+  });
+  if (!fallbackEventPayload.id) fallbackEventPayload.id = uid();
+  if (!fallbackEventPayload.status) fallbackEventPayload.status = 'DRAFT';
+  if (!fallbackEventPayload.title) fallbackEventPayload.title = 'Nouvel événement';
+  const fallbackEvent = upsertEventInMemory(fallbackEventPayload);
+  debouncedSave();
+  return res.status(201).json({ event: fallbackEvent, source: 'memory' });
 });
 
 app.put(['/events/:id', '/api/events/:id'], requireAuth, async (req, res) => {
-  try {
-    const updateData = { ...req.body };
-    if (updateData.date) updateData.date = new Date(updateData.date);
-    if (updateData.extras && typeof updateData.extras === 'object') {
-      updateData.extras = JSON.stringify(updateData.extras);
+  const prismaData = buildPrismaEventUpdateData(req.body || {});
+  const canUsePrisma = prismaAvailable && prisma && Object.keys(prismaData).length > 0;
+
+  if (canUsePrisma) {
+    try {
+      const event = await prisma.event.update({
+        where: { id: req.params.id },
+        data: prismaData
+      });
+      const synced = upsertEventInMemory(event) || event;
+      debouncedSave();
+      console.log('✅ Event modifié:', event.id, event.title);
+      return res.json({ event: synced, source: 'prisma' });
+    } catch (e) {
+      console.error('Erreur PUT /events/:id (Prisma):', e.message);
     }
-    
-    const event = await prisma.event.update({
-      where: { id: req.params.id },
-      data: updateData
-    });
-    console.log('✅ Event modifié:', event.id, event.title);
-    res.json({ event });
-  } catch (e) {
-    console.error('Erreur PUT /events/:id (Prisma):', e.message);
-    res.status(500).json({ error: 'Database error' });
   }
+
+  const stateUpdate = buildStateEventUpdateData(req.body || {});
+  const fallbackEvent = updateEventInMemory(req.params.id, stateUpdate);
+  if (fallbackEvent) {
+    debouncedSave();
+    console.log('🧠 Event modifié en mémoire:', req.params.id);
+    return res.json({ event: fallbackEvent, source: 'memory' });
+  }
+
+  res.status(404).json({ error: 'Event not found' });
 });
 
 app.delete(['/events/:id', '/api/events/:id'], requireAuth, async (req, res) => {
@@ -1553,6 +1690,11 @@ app.delete(['/events/:id', '/api/events/:id'], requireAuth, async (req, res) => 
       await prisma.event.delete({
         where: { id: req.params.id }
       });
+      const before = state.events?.length || 0;
+      state.events = (state.events || []).filter(ev => ev.id !== req.params.id);
+      if ((state.events?.length || 0) !== before) {
+        debouncedSave();
+      }
       console.log('✅ Event supprimé (Prisma):', req.params.id);
       return res.json({ ok: true });
     } catch (e) {
