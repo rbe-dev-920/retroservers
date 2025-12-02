@@ -12,6 +12,10 @@ const __dirname = path.dirname(__filename);
 
 dotenv.config();
 
+const LOAD_BACKUP_AT_BOOT = process.env.LOAD_BACKUP_AT_BOOT !== 'false';
+const ENABLE_MEMORY_FALLBACK = process.env.ENABLE_MEMORY_FALLBACK === 'true';
+const ENABLE_RUNTIME_STATE_SAVE = process.env.ENABLE_RUNTIME_STATE_SAVE !== 'false';
+
 // ============================================================
 // 🔧 INITIALISATION PRISMA avec détection d'erreur
 // ============================================================
@@ -113,6 +117,7 @@ const ensureDirectoryExists = (dirPath) => {
 };
 
 const persistStateToDisk = () => {
+  if (!ENABLE_RUNTIME_STATE_SAVE) return;
   try {
     ensureDirectoryExists(path.dirname(runtimeStatePath));
     fs.writeFileSync(runtimeStatePath, JSON.stringify({
@@ -473,8 +478,12 @@ function loadBackupAtStartup() {
   }
 }
 
-// Charger le backup au démarrage
-loadBackupAtStartup();
+// Charger le backup au démarrage (optionnel)
+if (LOAD_BACKUP_AT_BOOT) {
+  loadBackupAtStartup();
+} else {
+  console.log('⏭️  LOAD_BACKUP_AT_BOOT=false - aucun backup chargé au démarrage');
+}
 state.events = normalizeEventCollection(state.events || []);
 
 // CORS configuration - Allow frontend(s) and local dev
@@ -668,9 +677,11 @@ app.get('/public/events', async (req, res) => {
   } catch (e) {
     console.error('Erreur GET /public/events (Prisma):', e.message);
   }
-  // Fallback: retourner depuis state
-  const events = (state.events || []).filter(e => e.status === 'PUBLISHED');
-  res.json(events);
+  if (ENABLE_MEMORY_FALLBACK) {
+    const events = (state.events || []).filter(e => e.status === 'PUBLISHED');
+    return res.json(events);
+  }
+  res.status(503).json({ error: 'Prisma indisponible et mémoire désactivée' });
 });
 
 app.get('/public/events/:id', async (req, res) => {
@@ -682,7 +693,12 @@ app.get('/public/events/:id', async (req, res) => {
     res.json(event);
   } catch (e) {
     console.error('Erreur GET /public/events/:id (Prisma):', e.message);
-    res.status(500).json({ error: 'Database error' });
+    if (ENABLE_MEMORY_FALLBACK) {
+      const event = (state.events || []).find(e => e.id === req.params.id && e.status === 'PUBLISHED');
+      if (!event) return res.status(404).json({ error: 'Event not found' });
+      return res.json(event);
+    }
+    res.status(503).json({ error: 'Prisma indisponible et mémoire désactivée' });
   }
 });
 
@@ -696,8 +712,10 @@ app.get('/public/vehicles', async (req, res) => {
   } catch (e) {
     console.error('Erreur GET /public/vehicles (Prisma):', e.message);
   }
-  // Fallback: retourner depuis state
-  res.json(state.vehicles || []);
+  if (ENABLE_MEMORY_FALLBACK) {
+    return res.json(state.vehicles || []);
+  }
+  res.status(503).json({ error: 'Prisma indisponible et mémoire désactivée' });
 });
 
 app.get('/public/vehicles/:id', async (req, res) => {
@@ -709,7 +727,12 @@ app.get('/public/vehicles/:id', async (req, res) => {
     res.json(vehicle);
   } catch (e) {
     console.error('Erreur GET /public/vehicles/:id (Prisma):', e.message);
-    res.status(500).json({ error: 'Database error' });
+    if (ENABLE_MEMORY_FALLBACK) {
+      const vehicle = (state.vehicles || []).find(v => v.parc === req.params.id || String(v.id) === req.params.id);
+      if (!vehicle) return res.status(404).json({ error: 'Vehicle not found' });
+      return res.json(vehicle);
+    }
+    res.status(503).json({ error: 'Prisma indisponible et mémoire désactivée' });
   }
 });
 
