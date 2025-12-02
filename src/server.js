@@ -1515,70 +1515,144 @@ app.delete(['/vehicles/:parc/echancier/:id','/api/vehicles/:parc/echancier/:id']
 });
 
 // RETRO REQUESTS & NEWS (RetroAssistant, RétroDemandes)
-app.get(['/api/retro-requests'], requireAuth, (req, res) => {
-  // Map RetroNews to retro-requests format
-  const requests = state.retroNews.map(news => ({
-    id: news.id,
-    title: news.title,
-    body: news.body,
-    status: news.status || 'draft',
-    createdAt: news.publishedAt || news.createdAt,
-    author: news.author || 'anonyme',
-    type: 'news'
-  }));
-  res.json(requests);
+app.get(['/api/retro-requests'], requireAuth, async (req, res) => {
+  try {
+    // Get user's retro requests from Prisma
+    const requests = await prisma.retro_request.findMany({
+      where: { userId: req.user.id },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        retro_request_file: true,
+        retro_request_status_log: true
+      }
+    });
+    res.json({ requests });
+  } catch (e) {
+    console.error('Erreur GET retro-requests:', e.message);
+    res.status(500).json({ error: e.message });
+  }
 });
 
-app.get(['/api/retro-requests/admin/all'], requireAuth, (req, res) => {
-  // Return all retro requests with admin metadata
-  const requests = state.retroNews.map(news => ({
-    id: news.id,
-    title: news.title,
-    body: news.body,
-    status: news.status || 'draft',
-    createdAt: news.publishedAt || news.createdAt,
-    author: news.author || 'anonyme',
-    type: 'news',
-    adminOnly: true
-  }));
-  res.json(requests);
+app.get(['/api/retro-requests/admin/all'], requireAuth, async (req, res) => {
+  try {
+    // Check if user has ADMIN role
+    const member = await prisma.members.findUnique({ where: { id: req.user.id } });
+    const isAdmin = member?.role === 'ADMIN';
+    
+    if (!isAdmin) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+    
+    // Return all retro requests
+    const requests = await prisma.retro_request.findMany({
+      orderBy: { createdAt: 'desc' },
+      include: {
+        retro_request_file: true,
+        retro_request_status_log: true
+      }
+    });
+    res.json({ requests });
+  } catch (e) {
+    console.error('Erreur GET retro-requests/admin/all:', e.message);
+    res.status(500).json({ error: e.message });
+  }
 });
 
-app.post(['/api/retro-requests'], requireAuth, (req, res) => {
-  const request = {
-    id: uid(),
-    title: req.body.title,
-    body: req.body.body,
-    status: req.body.status || 'draft',
-    author: req.body.author || req.user?.id || 'anonyme',
-    createdAt: new Date().toISOString(),
-    type: 'news'
-  };
-  state.retroNews.push(request);
-  debouncedSave();
-  res.status(201).json(request);
+app.post(['/api/retro-requests'], requireAuth, async (req, res) => {
+  try {
+    const { title, description, category, priority, details } = req.body;
+    
+    if (!title || !description) {
+      return res.status(400).json({ error: 'Title and description are required' });
+    }
+    
+    // Get user info
+    const member = await prisma.members.findUnique({ where: { id: req.user.id } });
+    if (!member) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    const request = await prisma.retro_request.create({
+      data: {
+        id: Math.random().toString(36).substr(2, 9),
+        userId: req.user.id,
+        userName: `${member.firstName} ${member.lastName}`,
+        userEmail: member.email,
+        title,
+        description,
+        category: category || 'GENERAL',
+        priority: priority || 'NORMAL',
+        status: 'PENDING',
+        details: details || {}
+      }
+    });
+    
+    console.log('✅ RétroDemande créée:', request.id);
+    res.status(201).json({ request });
+  } catch (e) {
+    console.error('Erreur POST retro-requests:', e.message);
+    res.status(500).json({ error: 'Database error' });
+  }
 });
 
-app.put(['/api/retro-requests/:id'], requireAuth, (req, res) => {
-  const idx = state.retroNews.findIndex(r => r.id === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: 'Request not found' });
-  
-  state.retroNews[idx] = {
-    ...state.retroNews[idx],
-    title: req.body.title || state.retroNews[idx].title,
-    body: req.body.body || state.retroNews[idx].body,
-    status: req.body.status || state.retroNews[idx].status,
-    author: req.body.author || state.retroNews[idx].author,
-    updatedAt: new Date().toISOString()
-  };
-  debouncedSave();
-  res.json(state.retroNews[idx]);
+app.put(['/api/retro-requests/:id'], requireAuth, async (req, res) => {
+  try {
+    const { title, description, category, priority, status, notes } = req.body;
+    
+    // Check if request exists and user owns it
+    const request = await prisma.retro_request.findUnique({ where: { id: req.params.id } });
+    if (!request) {
+      return res.status(404).json({ error: 'Request not found' });
+    }
+    
+    // Only allow user to edit their own requests or admins to edit all
+    const member = await prisma.members.findUnique({ where: { id: req.user.id } });
+    const isAdmin = member?.role === 'ADMIN';
+    if (request.userId !== req.user.id && !isAdmin) {
+      return res.status(403).json({ error: 'Not authorized' });
+    }
+    
+    const updated = await prisma.retro_request.update({
+      where: { id: req.params.id },
+      data: {
+        title: title || request.title,
+        description: description || request.description,
+        category: category || request.category,
+        priority: priority || request.priority,
+        status: status || request.status,
+        notes: notes || request.notes,
+        updatedAt: new Date()
+      }
+    });
+    
+    res.json({ request: updated });
+  } catch (e) {
+    console.error('Erreur PUT retro-requests:', e.message);
+    res.status(500).json({ error: 'Database error' });
+  }
 });
 
-app.delete(['/api/retro-requests/:id'], requireAuth, (req, res) => {
-  state.retroNews = state.retroNews.filter(r => r.id !== req.params.id);
-  debouncedSave();
-  res.json({ ok: true });
+app.delete(['/api/retro-requests/:id'], requireAuth, async (req, res) => {
+  try {
+    // Check if request exists and user owns it
+    const request = await prisma.retro_request.findUnique({ where: { id: req.params.id } });
+    if (!request) {
+      return res.status(404).json({ error: 'Request not found' });
+    }
+    
+    // Only allow user to delete their own requests or admins to delete all
+    const member = await prisma.members.findUnique({ where: { id: req.user.id } });
+    const isAdmin = member?.role === 'ADMIN';
+    if (request.userId !== req.user.id && !isAdmin) {
+      return res.status(403).json({ error: 'Not authorized' });
+    }
+    
+    await prisma.retro_request.delete({ where: { id: req.params.id } });
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('Erreur DELETE retro-requests:', e.message);
+    res.status(500).json({ error: 'Database error' });
+  }
 });
 
 app.post(['/api/retro-requests/:id/status'], requireAuth, (req, res) => {
