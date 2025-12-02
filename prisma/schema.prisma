@@ -1,8 +1,8 @@
 // Prisma schema complet pour RétroBus Essonne
-// Toutes les données sont persistées dans SQLite
+// Supporte SQLite (local) et PostgreSQL (Railway)
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 

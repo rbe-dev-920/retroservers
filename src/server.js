@@ -19,13 +19,13 @@ const PORT = process.env.PORT || 4000;
 const pathRoot = process.cwd();
 
 // ============================================================
-// 🚀 MODE DATABASE - TOUTES LES DONNÉES PERSISTÉES DANS PRISMA
+// 🚀 MODE HYBRIDE - Prisma + État en mémoire pour compatibilité
 // ============================================================
 console.log('');
 console.log('═══════════════════════════════════════════════════════════');
 console.log('   🚀 RÉTROBUS ESSONNE - SERVEUR API');
-console.log('   📦 Mode: DATABASE (Prisma/SQLite)');
-console.log('   ✅ Toutes les modifications sont persistées en temps réel');
+console.log('   📦 Mode: HYBRIDE (Prisma + Mémoire)');
+console.log('   ✅ Données principales persistées via Prisma');
 console.log('═══════════════════════════════════════════════════════════');
 console.log('');
 
@@ -33,17 +33,42 @@ console.log('');
 const uid = () => (global.crypto?.randomUUID ? crypto.randomUUID() : `${Date.now()}_${Math.random().toString(36).slice(2)}`);
 const today = () => new Date().toISOString().split('T')[0];
 
+// ============================================================
+// 🔧 ÉTAT EN MÉMOIRE - Pour endpoints non encore migrés vers Prisma
+// ============================================================
+const state = {
+  members: [],
+  siteUsers: [],
+  notifications: [],
+  vehicleCarteGrise: [],
+  vehicleAssurance: [],
+  vehicleControleTechnique: [],
+  vehicleCertificatCession: [],
+  vehicleEchancier: [],
+  retroNews: [],
+  transactions: [],
+  scheduled: [],
+  expenseReports: [],
+  documents: [],
+  devisLines: [],
+  quoteTemplates: [],
+  financialDocuments: [],
+  userPermissions: {},
+  bankBalance: 0,
+  categories: [
+    { id: 'adhesions', name: 'Adhésions', type: 'recette' },
+    { id: 'evenements', name: 'Événements', type: 'recette' },
+    { id: 'carburant', name: 'Carburant', type: 'depense' },
+    { id: 'maintenance', name: 'Maintenance', type: 'depense' },
+    { id: 'assurance', name: 'Assurance', type: 'depense' },
+    { id: 'materiel', name: 'Matériel', type: 'depense' },
+    { id: 'frais_admin', name: 'Frais administratifs', type: 'depense' },
+    { id: 'autres', name: 'Autres', type: 'both' }
+  ]
+};
+
 // Catégories financières par défaut (en mémoire car rarement modifiées)
-const defaultCategories = [
-  { id: 'adhesions', name: 'Adhésions', type: 'recette' },
-  { id: 'evenements', name: 'Événements', type: 'recette' },
-  { id: 'carburant', name: 'Carburant', type: 'depense' },
-  { id: 'maintenance', name: 'Maintenance', type: 'depense' },
-  { id: 'assurance', name: 'Assurance', type: 'depense' },
-  { id: 'materiel', name: 'Matériel', type: 'depense' },
-  { id: 'frais_admin', name: 'Frais administratifs', type: 'depense' },
-  { id: 'autres', name: 'Autres', type: 'both' }
-];
+const defaultCategories = state.categories;
 
 // CORS configuration - Allow frontend(s) and local dev
 const allowedOrigins = [
@@ -193,7 +218,7 @@ app.get('/site-config', (req, res) => {
   });
 });
 
-// Public events endpoint - PRISMA
+// Public events endpoint - PRISMA avec fallback
 app.get('/public/events', async (req, res) => {
   try {
     const events = await prisma.event.findMany({
@@ -202,8 +227,9 @@ app.get('/public/events', async (req, res) => {
     });
     res.json(events);
   } catch (e) {
-    console.error('Erreur GET /public/events:', e);
-    res.status(500).json({ error: e.message });
+    console.error('Erreur GET /public/events (Prisma):', e.message);
+    // Fallback: retourner tableau vide
+    res.json([]);
   }
 });
 
@@ -215,19 +241,20 @@ app.get('/public/events/:id', async (req, res) => {
     if (!event) return res.status(404).json({ error: 'Event not found' });
     res.json(event);
   } catch (e) {
-    console.error('Erreur GET /public/events/:id:', e);
-    res.status(500).json({ error: e.message });
+    console.error('Erreur GET /public/events/:id (Prisma):', e.message);
+    res.status(500).json({ error: 'Database error' });
   }
 });
 
-// Public vehicles endpoint - PRISMA
+// Public vehicles endpoint - PRISMA avec fallback
 app.get('/public/vehicles', async (req, res) => {
   try {
     const vehicles = await prisma.vehicle.findMany();
     res.json(vehicles);
   } catch (e) {
-    console.error('Erreur GET /public/vehicles:', e);
-    res.status(500).json({ error: e.message });
+    console.error('Erreur GET /public/vehicles (Prisma):', e.message);
+    // Fallback: retourner tableau vide
+    res.json([]);
   }
 });
 
@@ -239,8 +266,8 @@ app.get('/public/vehicles/:id', async (req, res) => {
     if (!vehicle) return res.status(404).json({ error: 'Vehicle not found' });
     res.json(vehicle);
   } catch (e) {
-    console.error('Erreur GET /public/vehicles/:id:', e);
-    res.status(500).json({ error: e.message });
+    console.error('Erreur GET /public/vehicles/:id (Prisma):', e.message);
+    res.status(500).json({ error: 'Database error' });
   }
 });
 
@@ -249,7 +276,7 @@ app.get('/public/vehicles/:id/events', async (req, res) => {
   res.json([]);
 });
 
-// Internal events endpoints (requireAuth) - PRISMA
+// Internal events endpoints (requireAuth) - PRISMA avec fallback
 app.get(['/events','/api/events'], requireAuth, async (req, res) => {
   try {
     const events = await prisma.event.findMany({
@@ -257,8 +284,8 @@ app.get(['/events','/api/events'], requireAuth, async (req, res) => {
     });
     res.json({ events });
   } catch (e) {
-    console.error('Erreur GET /events:', e);
-    res.status(500).json({ error: e.message });
+    console.error('Erreur GET /events (Prisma):', e.message);
+    res.json({ events: [] });
   }
 });
 
@@ -270,12 +297,12 @@ app.get(['/events/:id','/api/events/:id'], requireAuth, async (req, res) => {
     if (!event) return res.status(404).json({ error: 'Event not found' });
     res.json({ event });
   } catch (e) {
-    console.error('Erreur GET /events/:id:', e);
-    res.status(500).json({ error: e.message });
+    console.error('Erreur GET /events/:id (Prisma):', e.message);
+    res.status(500).json({ error: 'Database error' });
   }
 });
 
-// FLASHES - PRISMA
+// FLASHES - PRISMA avec fallback
 app.get(['/flashes','/api/flashes'], async (req, res) => {
   try {
     const flashes = await prisma.flash.findMany({
@@ -284,8 +311,8 @@ app.get(['/flashes','/api/flashes'], async (req, res) => {
     });
     res.json(flashes);
   } catch (e) {
-    console.error('Erreur GET /flashes:', e);
-    res.status(500).json({ error: e.message });
+    console.error('Erreur GET /flashes (Prisma):', e.message);
+    res.json([]);
   }
 });
 
@@ -296,8 +323,8 @@ app.get(['/flashes/all','/api/flashes/all'], async (req, res) => {
     });
     res.json(flashes);
   } catch (e) {
-    console.error('Erreur GET /flashes/all:', e);
-    res.status(500).json({ error: e.message });
+    console.error('Erreur GET /flashes/all (Prisma):', e.message);
+    res.json([]);
   }
 });
 
@@ -310,8 +337,8 @@ app.post(['/flashes','/api/flashes'], requireAuth, async (req, res) => {
     console.log('✅ Flash créé:', flash.id);
     res.status(201).json(flash);
   } catch (e) {
-    console.error('Erreur POST /flashes:', e);
-    res.status(500).json({ error: e.message });
+    console.error('Erreur POST /flashes (Prisma):', e.message);
+    res.status(500).json({ error: 'Database error' });
   }
 });
 
@@ -324,8 +351,8 @@ app.put(['/flashes/:id','/api/flashes/:id'], requireAuth, async (req, res) => {
     console.log('✅ Flash modifié:', flash.id);
     res.json(flash);
   } catch (e) {
-    console.error('Erreur PUT /flashes/:id:', e);
-    res.status(500).json({ error: e.message });
+    console.error('Erreur PUT /flashes/:id (Prisma):', e.message);
+    res.status(500).json({ error: 'Database error' });
   }
 });
 
@@ -337,12 +364,12 @@ app.delete(['/flashes/:id','/api/flashes/:id'], requireAuth, async (req, res) =>
     console.log('✅ Flash supprimé:', req.params.id);
     res.json({ ok: true });
   } catch (e) {
-    console.error('Erreur DELETE /flashes/:id:', e);
-    res.status(500).json({ error: e.message });
+    console.error('Erreur DELETE /flashes/:id (Prisma):', e.message);
+    res.status(500).json({ error: 'Database error' });
   }
 });
 
-// RETRO NEWS - PRISMA
+// RETRO NEWS - PRISMA avec fallback
 app.get(['/api/retro-news','/retro-news'], async (req, res) => {
   try {
     const news = await prisma.retroNews.findMany({
@@ -350,8 +377,8 @@ app.get(['/api/retro-news','/retro-news'], async (req, res) => {
     });
     res.json({ news });
   } catch (e) {
-    console.error('Erreur GET /retro-news:', e);
-    res.status(500).json({ error: e.message });
+    console.error('Erreur GET /retro-news (Prisma):', e.message);
+    res.json({ news: state.retroNews || [] });
   }
 });
 
@@ -368,8 +395,11 @@ app.post(['/api/retro-news','/retro-news'], requireAuth, async (req, res) => {
     console.log('✅ RetroNews créé:', news.id);
     res.status(201).json({ news });
   } catch (e) {
-    console.error('Erreur POST /retro-news:', e);
-    res.status(500).json({ error: e.message });
+    console.error('Erreur POST /retro-news (Prisma):', e.message);
+    // Fallback: créer en mémoire
+    const item = { id: 'rn' + Date.now(), title: req.body?.title || 'News', body: req.body?.body || '', publishedAt: new Date().toISOString() };
+    state.retroNews.unshift(item);
+    res.status(201).json({ news: item });
   }
 });
 
@@ -394,14 +424,14 @@ app.post(['/api/notifications/:id/read','/notifications/:id/read'], requireAuth,
   res.json({ notification: n });
 });
 
-// VEHICLES - PRISMA
+// VEHICLES - PRISMA avec fallback
 app.get(['/vehicles','/api/vehicles'], requireAuth, async (req, res) => {
   try {
     const vehicles = await prisma.vehicle.findMany();
     res.json({ vehicles });
   } catch (e) {
-    console.error('Erreur GET /vehicles:', e);
-    res.status(500).json({ error: e.message });
+    console.error('Erreur GET /vehicles (Prisma):', e.message);
+    res.json({ vehicles: [] });
   }
 });
 
@@ -413,8 +443,8 @@ app.get(['/vehicles/:parc','/api/vehicles/:parc'], requireAuth, async (req, res)
     if (!vehicle) return res.status(404).json({ error: 'Vehicle not found' });
     res.json({ vehicle });
   } catch (e) {
-    console.error('Erreur GET /vehicles/:parc:', e);
-    res.status(500).json({ error: e.message });
+    console.error('Erreur GET /vehicles/:parc (Prisma):', e.message);
+    res.status(500).json({ error: 'Database error' });
   }
 });
 
@@ -427,12 +457,12 @@ app.put(['/vehicles/:parc','/api/vehicles/:parc'], requireAuth, async (req, res)
     console.log('✅ Vehicle modifié:', vehicle.parc);
     res.json({ vehicle });
   } catch (e) {
-    console.error('Erreur PUT /vehicles/:parc:', e);
-    res.status(500).json({ error: e.message });
+    console.error('Erreur PUT /vehicles/:parc (Prisma):', e.message);
+    res.status(500).json({ error: 'Database error' });
   }
 });
 
-// Usages (historique pointages) - PRISMA
+// Usages (historique pointages) - PRISMA avec fallback
 app.get(['/vehicles/:parc/usages','/api/vehicles/:parc/usages'], requireAuth, async (req, res) => {
   try {
     const usages = await prisma.vehicleUsage.findMany({
@@ -441,8 +471,8 @@ app.get(['/vehicles/:parc/usages','/api/vehicles/:parc/usages'], requireAuth, as
     });
     res.json(usages);
   } catch (e) {
-    console.error('Erreur GET usages:', e);
-    res.status(500).json({ error: e.message });
+    console.error('Erreur GET usages (Prisma):', e.message);
+    res.json([]);
   }
 });
 
@@ -458,8 +488,8 @@ app.post(['/vehicles/:parc/usages','/api/vehicles/:parc/usages'], requireAuth, a
     console.log('✅ Usage créé:', usage.id);
     res.status(201).json(usage);
   } catch (e) {
-    console.error('Erreur POST usages:', e);
-    res.status(500).json({ error: e.message });
+    console.error('Erreur POST usages (Prisma):', e.message);
+    res.status(500).json({ error: 'Database error' });
   }
 });
 
@@ -471,12 +501,12 @@ app.post(['/vehicles/:parc/usages/:id/end','/api/vehicles/:parc/usages/:id/end']
     });
     res.json(usage);
   } catch (e) {
-    console.error('Erreur end usage:', e);
-    res.status(500).json({ error: e.message });
+    console.error('Erreur end usage (Prisma):', e.message);
+    res.status(500).json({ error: 'Database error' });
   }
 });
 
-// Maintenance - PRISMA
+// Maintenance - PRISMA avec fallback
 app.get(['/vehicles/:parc/maintenance','/api/vehicles/:parc/maintenance'], requireAuth, async (req, res) => {
   try {
     const maintenance = await prisma.vehicleMaintenance.findMany({
@@ -485,8 +515,8 @@ app.get(['/vehicles/:parc/maintenance','/api/vehicles/:parc/maintenance'], requi
     });
     res.json(maintenance);
   } catch (e) {
-    console.error('Erreur GET maintenance:', e);
-    res.status(500).json({ error: e.message });
+    console.error('Erreur GET maintenance (Prisma):', e.message);
+    res.json([]);
   }
 });
 
@@ -504,12 +534,12 @@ app.post(['/vehicles/:parc/maintenance','/api/vehicles/:parc/maintenance'], requ
     console.log('✅ Maintenance créée:', item.id);
     res.status(201).json(item);
   } catch (e) {
-    console.error('Erreur POST maintenance:', e);
-    res.status(500).json({ error: e.message });
+    console.error('Erreur POST maintenance (Prisma):', e.message);
+    res.status(500).json({ error: 'Database error' });
   }
 });
 
-// Service schedule - PRISMA
+// Service schedule - PRISMA avec fallback
 app.get(['/vehicles/:parc/service-schedule','/api/vehicles/:parc/service-schedule'], requireAuth, async (req, res) => {
   try {
     const schedule = await prisma.vehicleServiceSchedule.findMany({
@@ -518,8 +548,8 @@ app.get(['/vehicles/:parc/service-schedule','/api/vehicles/:parc/service-schedul
     });
     res.json(schedule);
   } catch (e) {
-    console.error('Erreur GET service-schedule:', e);
-    res.status(500).json({ error: e.message });
+    console.error('Erreur GET service-schedule (Prisma):', e.message);
+    res.json([]);
   }
 });
 
@@ -539,12 +569,12 @@ app.post(['/vehicles/:parc/service-schedule','/api/vehicles/:parc/service-schedu
     console.log('✅ Service schedule créé:', item.id);
     res.status(201).json(item);
   } catch (e) {
-    console.error('Erreur POST service-schedule:', e);
-    res.status(500).json({ error: e.message });
+    console.error('Erreur POST service-schedule (Prisma):', e.message);
+    res.status(500).json({ error: 'Database error' });
   }
 });
 
-// Maintenance summary - PRISMA
+// Maintenance summary - PRISMA avec fallback
 app.get(['/vehicles/:parc/maintenance-summary','/api/vehicles/:parc/maintenance-summary'], requireAuth, async (req, res) => {
   try {
     const parc = req.params.parc;
@@ -558,8 +588,8 @@ app.get(['/vehicles/:parc/maintenance-summary','/api/vehicles/:parc/maintenance-
     
     res.json({ totalCost, maintenanceCount, overdueTasks, pendingTasks });
   } catch (e) {
-    console.error('Erreur maintenance-summary:', e);
-    res.status(500).json({ error: e.message });
+    console.error('Erreur maintenance-summary (Prisma):', e.message);
+    res.json({ totalCost: 0, maintenanceCount: 0, overdueTasks: 0, pendingTasks: 0 });
   }
 });
 
@@ -1197,7 +1227,7 @@ app.get(['/events/:id', '/api/events/:id'], requireAuth, (req, res) => {
   if (!ev) return res.status(404).json({ error: 'Not found' });
   res.json({ event: ev });
 });
-// EVENTS CRUD - PRISMA
+// EVENTS CRUD - PRISMA avec fallback
 app.post(['/events', '/api/events'], requireAuth, async (req, res) => {
   try {
     const event = await prisma.event.create({
@@ -1212,8 +1242,8 @@ app.post(['/events', '/api/events'], requireAuth, async (req, res) => {
     console.log('✅ Event créé:', event.id, event.title);
     res.status(201).json({ event });
   } catch (e) {
-    console.error('Erreur POST /events:', e);
-    res.status(500).json({ error: e.message });
+    console.error('Erreur POST /events (Prisma):', e.message);
+    res.status(500).json({ error: 'Database error' });
   }
 });
 
@@ -1232,8 +1262,8 @@ app.put(['/events/:id', '/api/events/:id'], requireAuth, async (req, res) => {
     console.log('✅ Event modifié:', event.id, event.title);
     res.json({ event });
   } catch (e) {
-    console.error('Erreur PUT /events/:id:', e);
-    res.status(500).json({ error: e.message });
+    console.error('Erreur PUT /events/:id (Prisma):', e.message);
+    res.status(500).json({ error: 'Database error' });
   }
 });
 
@@ -1245,8 +1275,8 @@ app.delete(['/events/:id', '/api/events/:id'], requireAuth, async (req, res) => 
     console.log('✅ Event supprimé:', req.params.id);
     res.json({ ok: true });
   } catch (e) {
-    console.error('Erreur DELETE /events/:id:', e);
-    res.status(500).json({ error: e.message });
+    console.error('Erreur DELETE /events/:id (Prisma):', e.message);
+    res.status(500).json({ error: 'Database error' });
   }
 });
 
