@@ -224,6 +224,7 @@ const requireAuth = (req, res, next) => {
 
 // ✅ Fonction de sauvegarde persistante - sauvegarde les changements en mémoire dans le backup JSON
 let lastBackupPath = null;
+let lastBackupName = null;
 let saveDebounceTimer = null;
 
 function saveStateToBackup() {
@@ -286,6 +287,31 @@ function saveStateToBackup() {
     
     fs.writeFileSync(lastBackupPath, JSON.stringify(backupData, null, 2), 'utf-8');
     console.log(`✅ Données sauvegardées dans ${path.basename(path.dirname(lastBackupPath))}`);
+    
+    // 🔥 NOUVEAU: Aussi mettre à jour l'index.json avec un timestamp plus récent
+    // pour que le prochain redémarrage charge les modifications
+    if (lastBackupName) {
+      try {
+        const indexPath = path.join(__dirname, '..', 'backups', 'index.json');
+        let backups = [];
+        
+        if (fs.existsSync(indexPath)) {
+          backups = JSON.parse(fs.readFileSync(indexPath, 'utf-8'));
+        }
+        
+        // Trouver et mettre à jour l'entrée du backup actuel avec un nouveau timestamp
+        const backupIndex = backups.findIndex(b => b.name === lastBackupName);
+        if (backupIndex !== -1) {
+          backups[backupIndex].timestamp = new Date().toISOString();
+          backups[backupIndex].description = 'Dernière modification: ' + new Date().toLocaleString('fr-FR');
+        }
+        
+        fs.writeFileSync(indexPath, JSON.stringify(backups, null, 2), 'utf-8');
+        console.log(`✅ Index.json mis à jour - timestamp du backup actualisé`);
+      } catch (error) {
+        console.warn('⚠️  Impossible de mettre à jour index.json:', error.message);
+      }
+    }
   } catch (error) {
     console.error('❌ Erreur lors de la sauvegarde:', error.message);
   }
@@ -325,6 +351,7 @@ async function initializeFromBackup() {
     
     // ✅ Enregistrer le chemin du backup pour les futures sauvegardes
     lastBackupPath = backupPath;
+    lastBackupName = latestBackup.name;
     
     const backupData = JSON.parse(fs.readFileSync(backupPath, 'utf-8'));
     console.log(`✅ Backup chargé: ${latestBackup.name}`);
