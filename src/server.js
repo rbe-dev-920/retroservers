@@ -28,11 +28,19 @@ const ENABLE_RUNTIME_STATE_SAVE = process.env.ENABLE_RUNTIME_STATE_SAVE === 'tru
 let prisma = null;
 let prismaAvailable = true; // Always true - Prisma is the single source of truth
 
+// Initialize Prisma without blocking startup
 try {
   prisma = new PrismaClient({
     log: ['warn', 'error'], // Only warn and error logs in production
   });
-  console.log('✅ PrismaClient initialized successfully');
+  console.log('✅ PrismaClient instance created');
+  
+  // Test connection asynchronously (don't block startup)
+  prisma.$queryRaw`SELECT 1`.then(() => {
+    console.log('✅ Database connection verified');
+  }).catch(e => {
+    console.warn('⚠️ Database connection check failed:', e.message);
+  });
 } catch (e) {
   console.error('❌ CRITICAL: Failed to initialize Prisma:', e.message);
   process.exit(1);
