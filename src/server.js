@@ -1438,7 +1438,8 @@ app.post(['/vehicles/:parc/certificat-cession','/api/vehicles/:parc/certificat-c
         certificatePath,
         notes: notes || '',
         dateImport: new Date(),
-        imported: true
+        imported: true,
+        updatedAt: new Date()
       },
       create: {
         id: uid(),
@@ -1446,7 +1447,8 @@ app.post(['/vehicles/:parc/certificat-cession','/api/vehicles/:parc/certificat-c
         certificatePath,
         notes: notes || '',
         dateImport: new Date(),
-        imported: true
+        imported: true,
+        updatedAt: new Date()
       }
     });
     
