@@ -597,7 +597,7 @@ app.get(['/api/health','/health'], (req, res) => res.json({ ok: true, time: new 
 app.get(['/api/export/state', '/export/state'], async (req, res) => {
   try {
     // En mode Prisma, récupérer les données depuis la base de données
-    const [members, vehicles, events, retroNews, flashes, transactions, expenseReports, documents, maintenances, usages] = await Promise.all([
+    const [members, vehicles, events, retroNews, flashes, transactions, expenseReports, documents, maintenances, usages, retroRequests, retroRequestFiles] = await Promise.all([
       prisma.members.findMany(),
       prisma.vehicle.findMany(),
       prisma.event.findMany(),
@@ -607,7 +607,9 @@ app.get(['/api/export/state', '/export/state'], async (req, res) => {
       prisma.financeExpenseReport.findMany(),
       prisma.document.findMany(),
       prisma.vehicleMaintenance.findMany(),
-      prisma.vehicleUsage.findMany()
+      prisma.vehicleUsage.findMany(),
+      prisma.retro_request.findMany(),
+      prisma.retro_request_file.findMany()
     ]);
 
     const exported = {
@@ -631,6 +633,8 @@ app.get(['/api/export/state', '/export/state'], async (req, res) => {
         vehicle_maintenance: { count: maintenances.length, data: maintenances },
         vehicle_service_schedule: { count: 0, data: [] },
         Usage: { count: usages.length, data: usages },
+        retro_request: { count: retroRequests.length, data: retroRequests },
+        retro_request_file: { count: retroRequestFiles.length, data: retroRequestFiles },
         notification_preferences: { count: 0, data: [] },
         scheduled_operations: { count: 0, data: [] },
         scheduled_operation_payments: { count: 0, data: [] }
@@ -1668,6 +1672,105 @@ app.post(['/api/retro-requests/:id/status'], requireAuth, (req, res) => {
   state.retroNews[idx].status = req.body.status;
   debouncedSave();
   res.json({ ok: true, news: state.retroNews[idx] });
+});
+
+// Upload file to retro request
+app.post(['/api/retro-requests/:id/upload'], requireAuth, multer({ storage: multer.memoryStorage() }).single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file provided' });
+    }
+
+    // Check if request exists
+    const request = await prisma.retro_request.findUnique({ where: { id: req.params.id } });
+    if (!request) {
+      return res.status(404).json({ error: 'Request not found' });
+    }
+
+    // Get member by email
+    const member = await prisma.members.findUnique({ where: { email: req.user.email } });
+    if (!member) {
+      return res.status(404).json({ error: 'Member not found' });
+    }
+
+    // Only owner or admin can upload
+    const isAdmin = member?.role === 'ADMIN';
+    if (request.userId !== member.id && !isAdmin) {
+      return res.status(403).json({ error: 'Not authorized' });
+    }
+
+    // Save file to disk
+    const uploadsDir = pathRoot + '/uploads/retro-requests';
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+
+    const fileName = `${Date.now()}-${req.file.originalname}`;
+    const filePath = uploadsDir + '/' + fileName;
+    fs.writeFileSync(filePath, req.file.buffer);
+
+    // Save file record to database
+    const fileRecord = await prisma.retro_request_file.create({
+      data: {
+        id: Math.random().toString(36).substr(2, 9),
+        requestId: req.params.id,
+        fileName: req.file.originalname,
+        filePath: filePath,
+        fileSize: req.file.size,
+        mimeType: req.file.mimetype,
+        uploadedBy: member.id
+      }
+    });
+
+    console.log('✅ File uploaded:', fileRecord.id, req.file.originalname);
+    res.status(201).json({ file: fileRecord });
+  } catch (e) {
+    console.error('Erreur POST retro-requests/:id/upload:', e.message);
+    res.status(500).json({ error: 'Upload failed' });
+  }
+});
+
+// Delete file from retro request
+app.delete(['/api/retro-requests/:id/files/:fileId'], requireAuth, async (req, res) => {
+  try {
+    // Get file record
+    const fileRecord = await prisma.retro_request_file.findUnique({ where: { id: req.params.fileId } });
+    if (!fileRecord) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+
+    // Check request exists
+    const request = await prisma.retro_request.findUnique({ where: { id: req.params.id } });
+    if (!request) {
+      return res.status(404).json({ error: 'Request not found' });
+    }
+
+    // Get member by email
+    const member = await prisma.members.findUnique({ where: { email: req.user.email } });
+    if (!member) {
+      return res.status(404).json({ error: 'Member not found' });
+    }
+
+    // Only owner or admin can delete
+    const isAdmin = member?.role === 'ADMIN';
+    if (request.userId !== member.id && !isAdmin) {
+      return res.status(403).json({ error: 'Not authorized' });
+    }
+
+    // Delete file from disk
+    if (fs.existsSync(fileRecord.filePath)) {
+      fs.unlinkSync(fileRecord.filePath);
+    }
+
+    // Delete file record
+    await prisma.retro_request_file.delete({ where: { id: req.params.fileId } });
+
+    console.log('✅ File deleted:', req.params.fileId);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('Erreur DELETE retro-requests/:id/files/:fileId:', e.message);
+    res.status(500).json({ error: 'Delete failed' });
+  }
 });
 
 // RETRO NEWS (content management)

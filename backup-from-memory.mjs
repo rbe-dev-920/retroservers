@@ -62,6 +62,21 @@ async function backupFromMemory() {
     const jsonPath = path.join(backupPath, 'data.json');
     fs.writeFileSync(jsonPath, JSON.stringify(backupData, null, 2));
     
+    // Copier les fichiers uploadés pour les demandes RétroDemandes
+    const uploadsSourceDir = path.join(__dirname, 'uploads', 'retro-requests');
+    const uploadsBackupDir = path.join(backupPath, 'uploads', 'retro-requests');
+    
+    if (fs.existsSync(uploadsSourceDir)) {
+      fs.mkdirSync(uploadsBackupDir, { recursive: true });
+      const files = fs.readdirSync(uploadsSourceDir);
+      for (const file of files) {
+        const source = path.join(uploadsSourceDir, file);
+        const dest = path.join(uploadsBackupDir, file);
+        fs.copyFileSync(source, dest);
+      }
+      console.log(`\n  ✅ Fichiers uploadés copiés (${files.length} fichiers)`);
+    }
+    
     // Créer un fichier manifest
     const manifest = {
       name: backupName,
