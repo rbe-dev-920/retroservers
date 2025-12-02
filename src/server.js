@@ -26,6 +26,7 @@ const ENABLE_RUNTIME_STATE_SAVE = process.env.ENABLE_RUNTIME_STATE_SAVE === 'tru
 // 🔧 INITIALISATION PRISMA (source unique de vérité)
 // ============================================================
 let prisma = null;
+let prismaAvailable = true; // Always true - Prisma is the single source of truth
 
 try {
   prisma = new PrismaClient({
