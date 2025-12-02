@@ -711,6 +711,7 @@ app.get(['/api/retro-news','/retro-news'], (req, res) => {
 app.post(['/api/retro-news','/retro-news'], requireAuth, (req, res) => {
   const item = { id: 'rn' + Date.now(), title: req.body?.title || 'News', body: req.body?.body || '', publishedAt: new Date().toISOString() };
   state.retroNews.unshift(item);
+  debouncedSave();
   res.status(201).json({ news: item });
 });
 
@@ -1440,6 +1441,7 @@ app.get(['/events/:id', '/api/events/:id'], requireAuth, (req, res) => {
 app.post(['/events', '/api/events'], requireAuth, (req, res) => {
   const ev = { id: uid(), status: 'draft', createdAt: today(), ...req.body };
   state.events.push(ev);
+  debouncedSave();
   res.status(201).json({ event: ev });
 });
 app.put(['/events/:id', '/api/events/:id'], requireAuth, (req, res) => {
@@ -1569,27 +1571,32 @@ app.post('/finance/expense-reports', requireAuth, upload.single('file'), (req, r
     eventId: eventId || null
   };
   state.expenseReports.unshift(report);
+  debouncedSave();
   res.status(201).json({ report });
 });
 app.put('/finance/expense-reports/:id', requireAuth, (req, res) => {
   state.expenseReports = state.expenseReports.map(r => r.id === req.params.id ? { ...r, ...req.body } : r);
   const report = state.expenseReports.find(r => r.id === req.params.id);
+  debouncedSave();
   res.json({ report });
 });
 app.post('/finance/expense-reports/:id/close', requireAuth, (req, res) => {
   state.expenseReports = state.expenseReports.map(r => r.id === req.params.id ? { ...r, status: 'closed', closedAt: new Date().toISOString() } : r);
   const report = state.expenseReports.find(r => r.id === req.params.id);
+  debouncedSave();
   res.json({ report });
 });
 app.post('/finance/expense-reports/:id/reimburse', requireAuth, (req, res) => {
   state.expenseReports = state.expenseReports.map(r => r.id === req.params.id ? { ...r, status: 'reimbursed', reimbursedAt: new Date().toISOString() } : r);
   const report = state.expenseReports.find(r => r.id === req.params.id);
+  debouncedSave();
   res.json({ report });
 });
 app.post('/finance/expense-reports/:id/status', requireAuth, (req, res) => {
   const { status } = req.body;
   state.expenseReports = state.expenseReports.map(r => r.id === req.params.id ? { ...r, status } : r);
   const report = state.expenseReports.find(r => r.id === req.params.id);
+  debouncedSave();
   res.json({ report });
 });
 app.delete('/finance/expense-reports/:id', requireAuth, (req, res) => {
