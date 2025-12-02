@@ -100,16 +100,34 @@ const defaultCategories = state.categories;
 function loadBackupAtStartup() {
   try {
     const backupDir = path.join(pathRoot, 'backups');
+    
+    // D'abord, chercher restore-info.json
+    let backupName = null;
     const restoreInfoPath = path.join(backupDir, 'restore-info.json');
     
-    // Vérifier si un restore est marqué
-    if (!fs.existsSync(restoreInfoPath)) {
+    if (fs.existsSync(restoreInfoPath)) {
+      const restoreInfo = JSON.parse(fs.readFileSync(restoreInfoPath, 'utf-8'));
+      backupName = restoreInfo.backupToRestore;
+    }
+    
+    // Si pas de restore-info.json, charger le backup le plus récent de index.json
+    if (!backupName) {
+      const indexPath = path.join(backupDir, 'index.json');
+      if (fs.existsSync(indexPath)) {
+        const backups = JSON.parse(fs.readFileSync(indexPath, 'utf-8'));
+        if (backups.length > 0) {
+          // Prendre le dernier (le plus récent)
+          backupName = backups[backups.length - 1].name;
+          console.log(`📌 Aucun restore-info.json, chargement du backup le plus récent: ${backupName}`);
+        }
+      }
+    }
+    
+    if (!backupName) {
       console.log('ℹ️  Aucun backup à charger');
       return;
     }
     
-    const restoreInfo = JSON.parse(fs.readFileSync(restoreInfoPath, 'utf-8'));
-    const backupName = restoreInfo.backupToRestore;
     const backupPath = path.join(backupDir, backupName, 'data.json');
     
     if (!fs.existsSync(backupPath)) {
@@ -120,53 +138,55 @@ function loadBackupAtStartup() {
     const backupData = JSON.parse(fs.readFileSync(backupPath, 'utf-8'));
     const tables = backupData.tables || {};
     
+    console.log(`📦 Chargement du backup: ${backupName}`);
+    
     // Charger chaque table dans state
     if (tables.members?.data) {
       state.members = tables.members.data;
-      console.log(`✅ Chargé ${state.members.length} adhérents`);
+      console.log(`   ✅ ${state.members.length} adhérents`);
     }
     if (tables.site_users?.data) {
       state.siteUsers = tables.site_users.data;
-      console.log(`✅ Chargé ${state.siteUsers.length} utilisateurs site`);
+      console.log(`   ✅ ${state.siteUsers.length} utilisateurs site`);
     }
     if (tables.Vehicle?.data) {
       state.vehicles = tables.Vehicle.data;
-      console.log(`✅ Chargé ${state.vehicles.length} véhicules`);
+      console.log(`   ✅ ${state.vehicles.length} véhicules`);
     }
     if (tables.RetroNews?.data) {
       state.retroNews = tables.RetroNews.data;
-      console.log(`✅ Chargé ${state.retroNews.length} actualités`);
+      console.log(`   ✅ ${state.retroNews.length} actualités`);
     }
     if (tables.Event?.data) {
       state.events = tables.Event.data;
-      console.log(`✅ Chargé ${state.events.length} événements`);
+      console.log(`   ✅ ${state.events.length} événements`);
     }
     if (tables.Flash?.data) {
       state.flashes = tables.Flash.data;
-      console.log(`✅ Chargé ${state.flashes.length} flashes`);
+      console.log(`   ✅ ${state.flashes.length} flashes`);
     }
     if (tables.finance_transactions?.data) {
       state.transactions = tables.finance_transactions.data;
-      console.log(`✅ Chargé ${state.transactions.length} transactions`);
+      console.log(`   ✅ ${state.transactions.length} transactions`);
     }
     if (tables.finance_expense_reports?.data) {
       state.expenseReports = tables.finance_expense_reports.data;
-      console.log(`✅ Chargé ${state.expenseReports.length} rapports de dépenses`);
+      console.log(`   ✅ ${state.expenseReports.length} rapports de dépenses`);
     }
     if (tables.DevisLine?.data) {
       state.devisLines = tables.DevisLine.data;
-      console.log(`✅ Chargé ${state.devisLines.length} lignes de devis`);
+      console.log(`   ✅ ${state.devisLines.length} lignes de devis`);
     }
     if (tables.QuoteTemplate?.data) {
       state.quoteTemplates = tables.QuoteTemplate.data;
-      console.log(`✅ Chargé ${state.quoteTemplates.length} templates de devis`);
+      console.log(`   ✅ ${state.quoteTemplates.length} templates de devis`);
     }
     if (tables.financial_documents?.data) {
       state.financialDocuments = tables.financial_documents.data;
-      console.log(`✅ Chargé ${state.financialDocuments.length} documents financiers`);
+      console.log(`   ✅ ${state.financialDocuments.length} documents financiers`);
     }
     
-    console.log('📦 Backup chargé avec succès en mémoire');
+    console.log('✨ Backup chargé avec succès en mémoire\n');
     
   } catch (error) {
     console.warn('⚠️  Erreur lors du chargement du backup:', error.message);
