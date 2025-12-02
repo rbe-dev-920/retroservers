@@ -1,315 +1,828 @@
-// Prisma schema complet pour RétroBus Essonne
-// PostgreSQL pour Railway/production
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearch"]
+}
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-generator client {
-  provider = "prisma-client-js"
-}
-
-// ===== MEMBRES & UTILISATEURS =====
-
-model Member {
-  id            String   @id @default(cuid())
-  email         String   @unique
-  firstName     String?
-  lastName      String?
-  status        String   @default("active")
-  permissions   String?  // JSON array
-  membershipType String? @default("STANDARD")
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  documents     Document[]
-  expenseReports ExpenseReport[]
-}
-
-model SiteUser {
-  id              String   @id @default(cuid())
-  email           String   @unique
-  linkedMemberId  String?
-  role            String   @default("MEMBER")
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-}
-
-model UserPermission {
-  id          String   @id @default(cuid())
-  userId      String
-  resource    String
-  actions     String   // JSON array
-  grantedAt   DateTime @default(now())
-  expiresAt   DateTime?
-  
-  @@index([userId])
-}
-
-// ===== VÉHICULES =====
-
-model Vehicle {
-  id                    Int      @id @default(autoincrement())
-  parc                  String   @unique
-  // Informations de base
-  marque                String?
-  modele                String?
-  type                  String?  @default("Bus")
-  etat                  String?  @default("disponible")
-  subtitle              String?
-  description           String?
-  history               String?
-  isPublic              Boolean  @default(false)
-  
-  // Immatriculation et identification
-  immat                 String?
-  
-  // Caractéristiques techniques
-  energie               String?
-  miseEnCirculation     DateTime?
-  longueur              String?
-  placesAssises         Int?
-  placesDebout          Int?
-  ufr                   String?
-  moteur                String?
-  boiteVitesses         String?
-  nombrePortes          Int?
-  climatisation         String?
-  girouette             String?
-  normeEuro             String?
-  livree                String?
-  
-  // État et préservation
-  statut                String?
-  preservePar           String?
-  
-  // Autres
-  fuel                  Int?     @default(0)
-  caracteristiques      String?  // JSON array pour champs supplémentaires
-  
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-}
-
-model VehicleUsage {
-  id          String   @id @default(cuid())
-  parc        String
-  conducteur  String?
-  note        String?
-  startedAt   DateTime @default(now())
-  endedAt     DateTime?
-}
-
-model VehicleMaintenance {
-  id          String   @id @default(cuid())
-  parc        String
-  type        String?
-  description String?
-  cost        Float?   @default(0)
-  mileage     Int?
-  performedBy String?
-  location    String?
-  status      String?  @default("completed")
-  date        DateTime @default(now())
-  nextDueDate DateTime?
-}
-
-model VehicleServiceSchedule {
-  id          String   @id @default(cuid())
-  parc        String
-  serviceType String?
-  description String?
-  frequency   String?
-  priority    String?  @default("normal")
-  status      String?  @default("pending")
-  plannedDate DateTime?
-}
-
-// ===== ÉVÉNEMENTS =====
-
-model Event {
-  id          String   @id @default(cuid())
-  title       String
-  description String?
-  date        DateTime?
-  status      String   @default("DRAFT")
-  extras      String?  // JSON for additional fields
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  transactions Transaction[]
-  scheduled    ScheduledExpense[]
-  expenseReports ExpenseReport[]
-}
-
-// ===== FLASHES & NOTIFICATIONS =====
-
-model Flash {
-  id        String   @id @default(cuid())
-  message   String?
-  content   String?
-  type      String?  @default("info")
-  active    Boolean  @default(false)
+model Changelog {
+  id        Int      @id @default(autoincrement())
+  title     String
+  version   String
+  date      DateTime @default(now())
+  changes   String
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime
 }
 
-model Notification {
-  id        String   @id @default(cuid())
-  type      String?  @default("info")
-  message   String?
-  read      Boolean  @default(false)
-  createdAt DateTime @default(now())
-}
-
-// ===== ACTUALITÉS =====
-
-model RetroNews {
-  id          String   @id @default(cuid())
-  title       String?
-  content     String?
-  excerpt     String?
-  imageUrl    String?
-  author      String?
-  published   Boolean  @default(false)
-  featured    Boolean  @default(false)
-  publishedAt DateTime?
+model DevisLine {
+  id          String   @id
+  devisId     String
+  quantity    Float    @default(1)
+  description String
+  unitPrice   Float
+  totalPrice  Float
+  order       Int      @default(0)
   createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  updatedAt   DateTime
+
+  @@index([devisId])
+  @@index([order])
 }
 
 model Document {
-  id         String   @id @default(cuid())
-  member     Member   @relation(fields: [memberId], references: [id])
-  memberId   String
-  type       String
-  status     String   @default("valid")
-  expiresAt  DateTime?
+  id          String         @id
+  memberId    String
+  type        DocumentType
+  fileName    String
+  filePath    String
+  fileSize    Int?
+  mimeType    String?
+  expiryDate  DateTime?
+  status      DocumentStatus @default(PENDING)
+  reviewedBy  String?
+  reviewedAt  DateTime?
+  reviewNotes String?
+  uploadedAt  DateTime       @default(now())
+  members     members        @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([expiryDate])
+  @@index([memberId])
+  @@index([status])
+  @@index([type])
+}
+
+model Event {
+  id                String              @id
+  title             String
+  date              DateTime
+  time              String?
+  location          String?
+  description       String?
+  helloAssoUrl      String?
+  adultPrice        Float?
+  childPrice        Float?
+  vehicleId         String?
+  status            EventStatus         @default(DRAFT)
+  layout            String?
+  extras            String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime
+  Vehicle           Vehicle?            @relation(fields: [vehicleId], references: [parc])
+  EventRegistration EventRegistration[]
+}
+
+model EventRegistration {
+  id               String   @id
+  eventId          String
+  participantName  String
+  participantEmail String
+  adultTickets     Int      @default(1)
+  childTickets     Int      @default(0)
+  totalAmount      Float
+  paymentMethod    String   @default("helloasso")
+  helloAssoStatus  String   @default("PENDING")
+  helloAssoOrderId String?
+  qrCodeData       String?
+  ticketSent       Boolean  @default(false)
+  registrationDate DateTime @default(now())
+  Event            Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+  @@index([participantEmail])
+}
+
+model Flash {
+  id             String    @id
+  content        String
+  type           String    @default("info")
+  active         Boolean   @default(true)
+  expiresAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime
+  createdBy      String?
+  showOnExternal Boolean   @default(false)
+}
+
+model NewsletterCampaign {
+  id             String    @id
+  title          String
+  subject        String
+  content        String
+  status         String    @default("DRAFT")
+  scheduledAt    DateTime?
+  sentAt         DateTime?
+  recipientCount Int?
+  successCount   Int?
+  failureCount   Int?
+  createdBy      String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime
+}
+
+model NewsletterSubscriber {
+  id        String   @id
+  email     String   @unique
+  status    String   @default("CONFIRMED")
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+}
+
+model QuoteTemplate {
+  id           String   @id
+  name         String
+  description  String?
+  htmlContent  String
+  logoSmall    String?
+  logoBig      String?
+  placeholders Json
+  isDefault    Boolean  @default(false)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime
+}
+
+model Report {
+  id          Int      @id @default(autoincrement())
+  parc        String
+  usageId     Int?
+  description String?
+  filesMeta   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+  Vehicle     Vehicle  @relation(fields: [parc], references: [parc], onDelete: Cascade)
+  Usage       Usage?   @relation(fields: [usageId], references: [id])
+}
+
+model RetroNews {
+  id             String    @id
+  title          String
+  content        String
+  excerpt        String?
+  imageUrl       String?
+  author         String?
+  published      Boolean   @default(false)
+  featured       Boolean   @default(false)
+  showOnExternal Boolean   @default(false)
+  createdBy      String?
+  publishedAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime
+
+  @@index([featured])
+  @@index([published])
+}
+
+model Stock {
+  id              Int             @id @default(autoincrement())
+  reference       String?         @unique
+  barcode         String?
+  name            String
+  description     String?
+  category        StockCategory   @default(GENERAL)
+  subcategory     String?
+  quantity        Int             @default(0)
+  minQuantity     Int             @default(0)
+  unit            StockUnit       @default(PIECE)
+  location        String?
+  supplier        String?
+  purchasePrice   Float?
+  salePrice       Float?
+  status          StockStatus     @default(AVAILABLE)
+  lastRestockDate DateTime?
+  expiryDate      DateTime?
+  notes           String?
+  createdBy       String
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime
+  StockMovement   StockMovement[]
+
+  @@index([category])
+  @@index([name])
+  @@index([quantity])
+  @@index([status])
+}
+
+model StockMovement {
+  id               Int          @id @default(autoincrement())
+  stockId          Int
+  type             MovementType
+  quantity         Int
+  previousQuantity Int
+  newQuantity      Int
+  reason           String?
+  notes            String?
+  userId           String
+  createdAt        DateTime     @default(now())
+  Stock            Stock        @relation(fields: [stockId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+  @@index([stockId])
+  @@index([type])
+}
+
+model Usage {
+  id           Int       @id @default(autoincrement())
+  parc         String
+  startedAt    DateTime
+  endedAt      DateTime?
+  conducteur   String?
+  participants String?
+  note         String?
+  relatedTo    String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime
+  Report       Report[]
+  Vehicle      Vehicle   @relation(fields: [parc], references: [parc], onDelete: Cascade)
+}
+
+model Vehicle {
+  id                       Int                        @id @default(autoincrement())
+  parc                     String                     @unique
+  type                     String
+  modele                   String
+  marque                   String?
+  subtitle                 String?
+  immat                    String?
+  etat                     String
+  miseEnCirculation        DateTime?
+  energie                  String?
+  description              String?
+  history                  String?
+  caracteristiques         String?
+  gallery                  String?
+  backgroundImage          String?
+  backgroundPosition       String?
+  createdAt                DateTime                   @default(now())
+  updatedAt                DateTime
+  isPublic                 Boolean                    @default(false)
+  fuel                     Float?
+  mileage                  Float?
+  Event                    Event[]
+  Report                   Report[]
+  Usage                    Usage[]
+  vehicle_maintenance      vehicle_maintenance[]
+  vehicle_service_schedule vehicle_service_schedule[]
+}
+
+model access_logs {
+  id          String      @id
+  siteUserId  String?
+  action      String
+  success     Boolean     @default(true)
+  ipAddress   String
+  userAgent   String?
+  performedBy String?
+  details     String?
+  timestamp   DateTime    @default(now())
+  site_users  site_users? @relation(fields: [siteUserId], references: [id], onDelete: Cascade)
+}
+
+model email_templates {
+  id        String   @id
+  name      String   @unique
+  subject   String
+  body      String
+  variables String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+}
+
+model finance_balance_history {
+  id         String   @id
+  oldBalance Float
+  newBalance Float
+  reason     String?
   createdAt  DateTime @default(now())
+
+  @@index([createdAt])
 }
 
-model Transaction {
-  id          String   @id @default(cuid())
-  type        String   // recette | depense
-  amount      Float    @default(0)
+model finance_balances {
+  id        String   @id
+  balance   Float
+  isLocked  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+model finance_categories {
+  id                             String                           @id
+  name                           String                           @unique
+  description                    String?
+  color                          String                           @default("#999999")
+  type                           String                           @default("BASIC")
+  createdAt                      DateTime                         @default(now())
+  updatedAt                      DateTime
+  finance_transaction_categories finance_transaction_categories[]
+}
+
+model finance_expense_reports {
+  id                   String   @id
+  description          String
+  amount               Float
+  date                 DateTime @default(now())
+  status               String   @default("SUBMITTED")
+  createdAt            DateTime @default(now())
+  approvedBy           String?
+  financeTransactionId String?
+  requestedByEmail     String?
+  requestedByName      String?
+  statusNotes          String?
+
+  @@index([createdAt])
+  @@index([status])
+}
+
+model finance_simulation_expense_items {
+  id                           String                       @id
+  scenarioId                   String
+  description                  String
+  amount                       Float
+  category                     String                       @default("AUTRE")
+  frequency                    String                       @default("MONTHLY")
+  createdAt                    DateTime                     @default(now())
+  finance_simulation_scenarios finance_simulation_scenarios @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+}
+
+model finance_simulation_income_items {
+  id                           String                       @id
+  scenarioId                   String
+  description                  String
+  amount                       Float
+  category                     String                       @default("AUTRE")
+  frequency                    String                       @default("MONTHLY")
+  createdAt                    DateTime                     @default(now())
+  finance_simulation_scenarios finance_simulation_scenarios @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+}
+
+model finance_simulation_scenarios {
+  id                               String                             @id
+  name                             String
+  description                      String
+  projectionMonths                 Int                                @default(12)
+  status                           String                             @default("DRAFT")
+  createdBy                        String
+  createdAt                        DateTime                           @default(now())
+  updatedAt                        DateTime
+  finance_simulation_expense_items finance_simulation_expense_items[]
+  finance_simulation_income_items  finance_simulation_income_items[]
+}
+
+model finance_transaction_categories {
+  id                   String               @id
+  transactionId        String
+  categoryId           String
+  allocatedAmount      Float
+  notes                String?
+  createdAt            DateTime             @default(now())
+  finance_categories   finance_categories   @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  finance_transactions finance_transactions @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  @@unique([transactionId, categoryId])
+  @@index([categoryId])
+  @@index([transactionId])
+}
+
+model finance_transactions {
+  id                             String                           @id
+  type                           String
+  amount                         Float
+  description                    String
+  category                       String?
+  date                           DateTime                         @default(now())
+  createdAt                      DateTime                         @default(now())
+  finance_transaction_categories finance_transaction_categories[]
+
+  @@index([createdAt])
+  @@index([date])
+}
+
+model financial_documents {
+  id                 String         @id
+  type               String         @default("QUOTE")
+  number             String
+  title              String
+  description        String?
+  date               DateTime       @default(now())
+  dueDate            DateTime?
+  amount             Float
+  taxRate            Float          @default(20)
+  taxAmount          Float          @default(0)
+  amountExcludingTax Float          @default(0)
+  quoteStatus        String?
+  invoiceStatus      String?
+  eventId            String?
+  memberId           String?
+  replacedById       String?
+  replaces           String?
+  notes              String?
+  internalNotes      String?
+  paymentMethod      String?
+  paymentDate        DateTime?
+  amountPaid         Float          @default(0)
+  templateId         String?
+  createdBy          String
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime
+  documentUrl        String?
+  htmlContent        String?
+  retroRequestId     String?
+  paymentHistory     String         @default("[]")
+  retro_request      retro_request? @relation(fields: [retroRequestId], references: [id])
+
+  @@unique([type, number])
+  @@index([date])
+  @@index([eventId])
+  @@index([invoiceStatus])
+  @@index([memberId])
+  @@index([quoteStatus])
+  @@index([retroRequestId])
+  @@index([type])
+}
+
+model gps_logs {
+  id        String   @id
+  vehicleId String?
+  latitude  Float
+  longitude Float
+  timestamp DateTime @default(now())
+  createdAt DateTime @default(now())
+}
+
+model internal_messages {
+  id          String           @id
+  fromUserId  String
+  toUserId    String
+  type        NotificationType @default(OTHER)
+  title       String
+  content     String
+  relatedId   String?
+  relatedType String?
+  readAt      DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime
+
+  @@index([createdAt])
+  @@index([readAt])
+  @@index([toUserId])
+}
+
+model members {
+  id                  String      @id
+  firstName           String
+  lastName            String
+  email               String      @unique
+  phone               String?
+  address             String?
+  city                String?
+  postalCode          String?
+  birthDate           DateTime?
+  memberNumber        String?     @unique
+  membershipType      String      @default("STANDARD")
+  membershipStatus    String      @default("PENDING")
+  membershipStartDate DateTime?
+  membershipEndDate   DateTime?
+  paymentAmount       Float?
+  paymentMethod       String?
+  hasLinkedAccess     Boolean     @default(false)
+  newsletter          Boolean     @default(true)
+  notes               String?
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime
+  createdBy           String?
+  Document            Document[]
+  site_users          site_users?
+}
+
+model notification_preferences {
+  id                       String   @id
+  userId                   String   @unique
+  ticketNotifications      Boolean  @default(true)
+  eventNotifications       Boolean  @default(true)
+  reportNotifications      Boolean  @default(true)
+  maintenanceNotifications Boolean  @default(true)
+  systemNotifications      Boolean  @default(true)
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime
+}
+
+model retro_report_comments {
+  id            String        @id
+  reportId      String
+  author        String
+  message       String
+  createdAt     DateTime      @default(now())
+  retro_reports retro_reports @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+  @@index([reportId])
+}
+
+model retro_reports {
+  id                    String                  @id
+  title                 String
+  description           String
+  category              String?
+  type                  String                  @default("bug")
+  priority              String                  @default("medium")
+  status                String                  @default("open")
+  createdBy             String
+  createdByUserId       String?
+  assignedTo            String?
+  attachments           String?
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime
+  retro_report_comments retro_report_comments[]
+
+  @@index([createdAt])
+  @@index([priority])
+  @@index([status])
+}
+
+model retro_request {
+  id                       String                     @id
+  userId                   String
+  userName                 String
+  userEmail                String
+  title                    String
+  description              String
+  details                  Json                       @default("{}")
+  category                 String                     @default("GENERAL")
+  priority                 String                     @default("NORMAL")
+  status                   String                     @default("PENDING")
+  estimatedCost            Float?
+  actualCost               Float?
+  notes                    String?
+  createdAt                DateTime                   @default(now())
+  updatedAt                DateTime
+  closedAt                 DateTime?
+  financial_documents      financial_documents[]
+  retro_request_file       retro_request_file[]
+  retro_request_status_log retro_request_status_log[]
+
+  @@index([category])
+  @@index([createdAt])
+  @@index([status])
+  @@index([userId])
+}
+
+model retro_request_file {
+  id            String        @id
+  requestId     String
+  fileName      String
+  filePath      String
+  fileSize      Int
+  mimeType      String
+  uploadedBy    String
+  uploadedAt    DateTime      @default(now())
+  retro_request retro_request @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId])
+}
+
+model retro_request_status_log {
+  id             String        @id
+  requestId      String
+  previousStatus String?
+  newStatus      String
+  changedBy      String
+  reason         String?
+  changedAt      DateTime      @default(now())
+  retro_request  retro_request @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([changedAt])
+  @@index([requestId])
+}
+
+model routes {
+  id          String   @id
+  name        String
   description String?
-  category    String?
-  date        DateTime @default(now())
-  event       Event?   @relation(fields: [eventId], references: [id])
-  eventId     String?
   createdAt   DateTime @default(now())
+  updatedAt   DateTime
 }
 
-model ScheduledExpense {
-  id          String   @id @default(cuid())
-  type        String   // recette | depense
-  amount      Float    @default(0)
-  description String?
-  category    String?
-  dueDate     DateTime?
-  recurring   String?  // none | monthly | yearly
-  event       Event?   @relation(fields: [eventId], references: [id])
-  eventId     String?
-  createdAt   DateTime @default(now())
+model scheduled_operation_payments {
+  id                   String               @id
+  scheduledOperationId String
+  period               String
+  amount               Float
+  paidAt               DateTime             @default(now())
+  fileName             String?
+  mimeType             String?
+  size                 Int?
+  attachmentDataUrl    String?
+  scheduled_operations scheduled_operations @relation(fields: [scheduledOperationId], references: [id], onDelete: Cascade)
+
+  @@index([paidAt])
+  @@index([period])
+  @@index([scheduledOperationId])
 }
 
-model ExpenseReport {
-  id          String   @id @default(cuid())
-  date        DateTime @default(now())
-  description String?
-  amount      Float    @default(0)
-  status      String   @default("open") // open | closed | reimbursed
-  planned     Boolean  @default(false)
-  fileName    String?
-  fileUrl     String?
-  member      Member?  @relation(fields: [memberId], references: [id])
-  memberId    String?
-  event       Event?   @relation(fields: [eventId], references: [id])
-  eventId     String?
-  createdAt   DateTime @default(now())
-  reimbursedAt DateTime?
-  closedAt    DateTime?
+model scheduled_operations {
+  id                           String                         @id
+  type                         String
+  description                  String
+  amount                       Float
+  dueDate                      DateTime?
+  category                     String?
+  recurring                    String                         @default("MONTHLY")
+  notes                        String?
+  isExecuted                   Boolean                        @default(false)
+  createdBy                    String
+  createdAt                    DateTime                       @default(now())
+  updatedAt                    DateTime                       @default(now())
+  frequency                    String                         @default("MONTHLY")
+  nextDate                     DateTime?
+  totalAmount                  Float?
+  scheduled_operation_payments scheduled_operation_payments[]
 }
 
-// ===== ADMINISTRATION VÉHICULES =====
-
-model VehicleGrayscale {
-  id                String   @id @default(cuid())
-  vehicleId         String   @unique // référence au véhicule (parc)
-  currentGrayscaleNumber String // numéro CG actuelle
-  currentGrayscaleUrl String? // URL du fichier CG
-  previousGrayscaleNumber String? // ancienne CG
-  previousGrayscaleUrl String? // URL ancienne CG
-  registrationDate  DateTime?
-  expiresAt         DateTime?
-  status            String   @default("valid") // valid | expired
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+model site_users {
+  id                 String             @id
+  username           String             @unique
+  firstName          String
+  lastName           String
+  email              String             @unique
+  password           String
+  role               String             @default("MEMBER")
+  hasInternalAccess  Boolean            @default(false)
+  hasExternalAccess  Boolean            @default(false)
+  isActive           Boolean            @default(true)
+  mustChangePassword Boolean            @default(false)
+  lastLoginAt        DateTime?
+  linkedMemberId     String?            @unique
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime
+  createdBy          String?
+  customPermissions  String?
+  access_logs        access_logs[]
+  members            members?           @relation(fields: [linkedMemberId], references: [id])
+  user_permissions   user_permissions[]
 }
 
-model VehicleCessionCertificate {
-  id                String   @id @default(cuid())
-  vehicleId         String   @unique // référence au véhicule (parc)
-  certificateUrl    String? // URL du fichier de cession
-  issuedDate        DateTime?
-  issuedBy          String? // nom du vendeur
-  status            String   @default("active") // active | archived
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+model user_permissions {
+  id         String     @id
+  userId     String
+  createdAt  DateTime   @default(now())
+  actions    String?
+  expiresAt  DateTime?
+  grantedAt  DateTime   @default(now())
+  grantedBy  String?
+  reason     String?
+  resource   String
+  updatedAt  DateTime
+  site_users site_users @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, resource])
+  @@index([expiresAt])
+  @@index([resource])
+  @@index([userId])
 }
 
-model VehicleInsurance {
-  id                String   @id @default(cuid())
-  vehicleId         String   @unique // référence au véhicule (parc)
-  attestationUrl    String? // URL attestation PDF
-  insuranceCompany  String? // nom assureur
-  policyNumber      String? // numéro police
-  validFrom         DateTime? // date début validité
-  validUntil        DateTime? // date fin validité
-  validFromTime     String? // heure début (HH:mm)
-  validUntilTime    String? // heure fin (HH:mm)
-  status            String   @default("valid") // valid | expired | pending
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-}
+model vehicle_maintenance {
+  id          String    @id
+  vehicleId   Int
+  type        String    @default("other")
+  description String
+  cost        Float     @default(0)
+  mileage     Int?
+  performedBy String?
+  location    String?
+  status      String    @default("completed")
+  notes       String?
+  date        DateTime  @default(now())
+  nextDueDate DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime
+  Vehicle     Vehicle   @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
 
-model VehicleInspection {
-  id                String   @id @default(cuid())
-  vehicleId         String   // référence au véhicule (parc)
-  attestationUrl    String? // URL attestation CT
-  inspectionDate    DateTime? // date du dernier CT
-  expiryDate        DateTime? // date expiration CT
-  mileage           Int? // kilométrage au CT
-  status            String   @default("valid") // valid | expired | contravisite | pending
-  defects           String? // défauts relevés (JSON)
-  nextInspectionDate DateTime? // date prochain CT obligatoire
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  @@unique([vehicleId, inspectionDate]) // un seul CT par date
-}
-
-model VehicleScheduleItem {
-  id                String   @id @default(cuid())
-  vehicleId         String // référence au véhicule (parc)
-  type              String // "cg" | "insurance" | "inspection" | "maintenance" | "custom"
-  description       String // ex: "Renouvellement assurance"
-  dueDate           DateTime
-  dueTime           String? // heure (HH:mm)
-  priority          String   @default("normal") // low | normal | high | critical
-  status            String   @default("pending") // pending | completed | overdue
-  notes             String? // notes additionnelles
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  @@index([date])
   @@index([vehicleId])
-  @@index([dueDate])
 }
 
-model VehicleAdministrativeNote {
-  id                String   @id @default(cuid())
-  vehicleId         String // référence au véhicule (parc)
-  category          String // "administrative" | "maintenance" | "legal" | "other"
-  content           String // contenu de la note
-  attachmentUrl     String? // URL d'une pièce jointe si nécessaire
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+model vehicle_service_schedule {
+  id          String    @id
+  vehicleId   Int
+  serviceType String    @default("other")
+  description String?
+  frequency   String    @default("yearly")
+  priority    String    @default("medium")
+  status      String    @default("pending")
+  notes       String?
+  plannedDate DateTime
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime
+  Vehicle     Vehicle   @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([plannedDate])
+  @@index([status])
   @@index([vehicleId])
+}
+
+enum DocumentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+}
+
+enum DocumentType {
+  DRIVING_LICENSE
+  IDENTITY_CARD
+  INSURANCE_RECORD
+  MEMBERSHIP_FORM
+  MEDICAL_CERTIFICATE
+  OTHER
+}
+
+enum EventStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum MemberRole {
+  MEMBER
+  DRIVER
+  ADMIN
+  BUREAU
+}
+
+enum MembershipStatus {
+  PENDING
+  ACTIVE
+  EXPIRED
+  SUSPENDED
+  CANCELLED
+}
+
+enum MembershipType {
+  STANDARD
+  FAMILY
+  STUDENT
+  HONORARY
+  LIFETIME
+}
+
+enum MovementType {
+  IN
+  OUT
+  ADJUSTMENT
+}
+
+enum NotificationType {
+  TICKET_CREATED
+  TICKET_UPDATED
+  EVENT_CREATED
+  EVENT_UPDATED
+  REPORT_CREATED
+  MAINTENANCE_ALERT
+  SYSTEM_MESSAGE
+  OTHER
+}
+
+enum QuoteType {
+  DEVIS
+  FACTURE
+  BON_DE_COMMANDE
+  RAPPEL
+}
+
+enum StockCategory {
+  PIECES_DETACHEES
+  CONSOMMABLES
+  OUTILLAGE
+  EQUIPEMENT
+  DOCUMENTATION
+  MERCHANDISING
+  FOURNITURES
+  SECURITE
+  GENERAL
+}
+
+enum StockStatus {
+  AVAILABLE
+  LOW_STOCK
+  OUT_OF_STOCK
+  DISCONTINUED
+  RESERVED
+}
+
+enum StockUnit {
+  PIECE
+  KG
+  LITRE
+  METRE
+  PAQUET
+  BOITE
+  ROULEAU
+  SET
+  AUTRE
 }

@@ -23,25 +23,18 @@ const ENABLE_MEMORY_FALLBACK = process.env.ENABLE_MEMORY_FALLBACK === 'true';
 const ENABLE_RUNTIME_STATE_SAVE = process.env.ENABLE_RUNTIME_STATE_SAVE === 'true';
 
 // ============================================================
-// 🔧 INITIALISATION PRISMA avec détection d'erreur
+// 🔧 INITIALISATION PRISMA (source unique de vérité)
 // ============================================================
 let prisma = null;
-let prismaAvailable = false;
 
 try {
-  prisma = new PrismaClient();
-  // Test rapide de connexion
-  const dbUrl = process.env.DATABASE_URL || '';
-  if (dbUrl.startsWith('file:') || dbUrl.startsWith('postgresql://') || dbUrl.startsWith('postgres://')) {
-    prismaAvailable = true;
-    console.log('✅ Prisma initialisé - DATABASE_URL valide');
-  } else {
-    console.warn('⚠️  DATABASE_URL invalide ou manquante - mode mémoire activé');
-    prismaAvailable = false;
-  }
+  prisma = new PrismaClient({
+    log: ['warn', 'error'], // Only warn and error logs in production
+  });
+  console.log('✅ PrismaClient initialized successfully');
 } catch (e) {
-  console.warn('⚠️  Prisma non disponible:', e.message);
-  prismaAvailable = false;
+  console.error('❌ CRITICAL: Failed to initialize Prisma:', e.message);
+  process.exit(1);
 }
 
 const app = express();
@@ -54,12 +47,9 @@ const pathRoot = process.cwd();
 // ============================================================
 console.log('');
 console.log('═══════════════════════════════════════════════════════════');
-console.log('   🚀 RÉTROBUS ESSONNE - SERVEUR API');
-console.log('   📦 Mode:', prismaAvailable ? 'HYBRIDE (Prisma + Mémoire)' : 'MÉMOIRE SEULE');
-console.log('   ✅', prismaAvailable ? 'Données persistées via Prisma' : 'Données en mémoire uniquement');
-console.log('   ⚠️  LOAD_BACKUP_AT_BOOT:', LOAD_BACKUP_AT_BOOT ? 'ENABLED' : 'DISABLED (Recommended)');
-console.log('   ⚠️  ENABLE_MEMORY_FALLBACK:', ENABLE_MEMORY_FALLBACK ? 'ENABLED' : 'DISABLED (Recommended)');
-console.log('   ⚠️  ENABLE_RUNTIME_STATE_SAVE:', ENABLE_RUNTIME_STATE_SAVE ? 'ENABLED' : 'DISABLED (Recommended)');
+console.log('   🚀 RÉTROBUS ESSONNE - SERVEUR API (PRISMA MODE)');
+console.log('   📦 Database: Railway PostgreSQL');
+console.log('   ✅ Single source of truth: Prisma ORM');
 console.log('═══════════════════════════════════════════════════════════');
 console.log('');
 
@@ -692,24 +682,18 @@ app.get('/site-config', (req, res) => {
   });
 });
 
-// Public events endpoint - PRISMA avec fallback
+// Public events endpoint
 app.get('/public/events', async (req, res) => {
   try {
-    if (prismaAvailable) {
-      const events = await prisma.event.findMany({
-        where: { status: 'PUBLISHED' },
-        orderBy: { date: 'desc' }
-      });
-      return res.json(events);
-    }
+    const events = await prisma.event.findMany({
+      where: { status: 'PUBLISHED' },
+      orderBy: { date: 'desc' }
+    });
+    res.json(events);
   } catch (e) {
-    console.error('Erreur GET /public/events (Prisma):', e.message);
+    console.error('❌ GET /public/events error:', e.message);
+    res.status(500).json({ error: 'Failed to fetch events', details: e.message });
   }
-  if (ENABLE_MEMORY_FALLBACK) {
-    const events = (state.events || []).filter(e => e.status === 'PUBLISHED');
-    return res.json(events);
-  }
-  res.status(503).json({ error: 'Prisma indisponible et mémoire désactivée' });
 });
 
 app.get('/public/events/:id', async (req, res) => {
@@ -720,13 +704,8 @@ app.get('/public/events/:id', async (req, res) => {
     if (!event) return res.status(404).json({ error: 'Event not found' });
     res.json(event);
   } catch (e) {
-    console.error('Erreur GET /public/events/:id (Prisma):', e.message);
-    if (ENABLE_MEMORY_FALLBACK) {
-      const event = (state.events || []).find(e => e.id === req.params.id && e.status === 'PUBLISHED');
-      if (!event) return res.status(404).json({ error: 'Event not found' });
-      return res.json(event);
-    }
-    res.status(503).json({ error: 'Prisma indisponible et mémoire désactivée' });
+    console.error('❌ GET /public/events/:id error:', e.message);
+    res.status(500).json({ error: 'Failed to fetch event', details: e.message });
   }
 });
 
