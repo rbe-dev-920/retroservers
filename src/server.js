@@ -12,9 +12,19 @@ const __dirname = path.dirname(__filename);
 
 dotenv.config();
 
-const LOAD_BACKUP_AT_BOOT = process.env.LOAD_BACKUP_AT_BOOT !== 'false';
+// ============================================================
+// 🔒 DATA PERSISTENCE CONFIGURATION
+// ============================================================
+// CRITICAL: These flags control how data is loaded and persisted.
+// In PRODUCTION, always use:
+//   LOAD_BACKUP_AT_BOOT=false      (do NOT reload old backups)
+//   ENABLE_MEMORY_FALLBACK=false   (do NOT serve stale memory)
+//   ENABLE_RUNTIME_STATE_SAVE=false (do NOT save state to disk)
+// This ensures Prisma PostgreSQL is the ONLY source of truth.
+// ============================================================
+const LOAD_BACKUP_AT_BOOT = process.env.LOAD_BACKUP_AT_BOOT === 'true'; // Changed: default FALSE
 const ENABLE_MEMORY_FALLBACK = process.env.ENABLE_MEMORY_FALLBACK === 'true';
-const ENABLE_RUNTIME_STATE_SAVE = process.env.ENABLE_RUNTIME_STATE_SAVE !== 'false';
+const ENABLE_RUNTIME_STATE_SAVE = process.env.ENABLE_RUNTIME_STATE_SAVE === 'true'; // Changed: default FALSE
 
 // ============================================================
 // 🔧 INITIALISATION PRISMA avec détection d'erreur
@@ -51,6 +61,9 @@ console.log('══════════════════════�
 console.log('   🚀 RÉTROBUS ESSONNE - SERVEUR API');
 console.log('   📦 Mode:', prismaAvailable ? 'HYBRIDE (Prisma + Mémoire)' : 'MÉMOIRE SEULE');
 console.log('   ✅', prismaAvailable ? 'Données persistées via Prisma' : 'Données en mémoire uniquement');
+console.log('   ⚠️  LOAD_BACKUP_AT_BOOT:', LOAD_BACKUP_AT_BOOT ? 'ENABLED' : 'DISABLED (Recommended)');
+console.log('   ⚠️  ENABLE_MEMORY_FALLBACK:', ENABLE_MEMORY_FALLBACK ? 'ENABLED' : 'DISABLED (Recommended)');
+console.log('   ⚠️  ENABLE_RUNTIME_STATE_SAVE:', ENABLE_RUNTIME_STATE_SAVE ? 'ENABLED' : 'DISABLED (Recommended)');
 console.log('═══════════════════════════════════════════════════════════');
 console.log('');
 
