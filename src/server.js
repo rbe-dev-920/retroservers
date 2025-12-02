@@ -326,6 +326,36 @@ const requireAuth = (req, res, next) => {
 // Health & version
 app.get(['/api/health','/health'], (req, res) => res.json({ ok: true, time: new Date().toISOString(), version: 'rebuild-1' }));
 
+// Export endpoint pour sauvegarde - accessible pour les scripts de backup
+app.get(['/api/export/state', '/export/state'], (req, res) => {
+  const exported = {
+    timestamp: new Date().toISOString(),
+    description: 'Export complet de l\'état en mémoire',
+    tables: {
+      members: { count: state.members.length, data: state.members },
+      site_users: { count: state.siteUsers.length, data: state.siteUsers },
+      Vehicle: { count: state.vehicles.length, data: state.vehicles },
+      Event: { count: state.events.length, data: state.events },
+      RetroNews: { count: state.retroNews.length, data: state.retroNews },
+      Flash: { count: state.flashes.length, data: state.flashes },
+      finance_transactions: { count: state.transactions.length, data: state.transactions },
+      finance_expense_reports: { count: state.expenseReports.length, data: state.expenseReports },
+      Document: { count: state.documents.length, data: state.documents },
+      DevisLine: { count: state.devisLines.length, data: state.devisLines },
+      QuoteTemplate: { count: state.quoteTemplates.length, data: state.quoteTemplates },
+      financial_documents: { count: state.financialDocuments.length, data: state.financialDocuments },
+      user_permissions: { count: Object.keys(state.userPermissions).length, data: state.userPermissions },
+      vehicle_maintenance: { count: state.vehicleMaintenance?.length || 0, data: state.vehicleMaintenance || [] },
+      vehicle_service_schedule: { count: state.vehicleServiceSchedule?.length || 0, data: state.vehicleServiceSchedule || [] },
+      Usage: { count: state.vehicleUsage?.length || 0, data: state.vehicleUsage || [] },
+      notification_preferences: { count: state.notificationPreferences?.length || 0, data: state.notificationPreferences || [] },
+      scheduled_operations: { count: state.scheduledOperations?.length || 0, data: state.scheduledOperations || [] },
+      scheduled_operation_payments: { count: state.scheduledOperationPayments?.length || 0, data: state.scheduledOperationPayments || [] }
+    }
+  };
+  res.json(exported);
+});
+
 // AUTH
 app.post(['/auth/login','/api/auth/login'], (req, res) => {
   const { email, password } = req.body || {};
