@@ -1774,6 +1774,84 @@ app.delete(['/api/retro-requests/:id/files/:fileId'], requireAuth, async (req, r
   }
 });
 
+// Lier un devis à une demande
+app.post(['/api/retro-requests/:id/link-devis'], requireAuth, async (req, res) => {
+  try {
+    const { devisId } = req.body;
+    if (!devisId) {
+      return res.status(400).json({ error: 'devisId is required' });
+    }
+
+    // Get request and verify ownership/admin
+    const request = await prisma.retro_request.findUnique({ where: { id: req.params.id } });
+    if (!request) {
+      return res.status(404).json({ error: 'Request not found' });
+    }
+
+    const member = await prisma.members.findUnique({ where: { email: req.user.email } });
+    const isAdmin = member?.role === 'ADMIN';
+    if (request.userId !== member.id && !isAdmin) {
+      return res.status(403).json({ error: 'Not authorized' });
+    }
+
+    // Update request with devis link
+    const updated = await prisma.retro_request.update({
+      where: { id: req.params.id },
+      data: {
+        details: {
+          ...request.details,
+          linkedDevisId: devisId
+        }
+      }
+    });
+
+    console.log('✅ Devis lié à la demande:', devisId);
+    res.json({ ok: true, request: updated });
+  } catch (e) {
+    console.error('Erreur POST retro-requests/:id/link-devis:', e.message);
+    res.status(500).json({ error: 'Link failed' });
+  }
+});
+
+// Lier une facture à une demande
+app.post(['/api/retro-requests/:id/link-facture'], requireAuth, async (req, res) => {
+  try {
+    const { factureId } = req.body;
+    if (!factureId) {
+      return res.status(400).json({ error: 'factureId is required' });
+    }
+
+    // Get request and verify ownership/admin
+    const request = await prisma.retro_request.findUnique({ where: { id: req.params.id } });
+    if (!request) {
+      return res.status(404).json({ error: 'Request not found' });
+    }
+
+    const member = await prisma.members.findUnique({ where: { email: req.user.email } });
+    const isAdmin = member?.role === 'ADMIN';
+    if (request.userId !== member.id && !isAdmin) {
+      return res.status(403).json({ error: 'Not authorized' });
+    }
+
+    // Update request with facture link
+    const updated = await prisma.retro_request.update({
+      where: { id: req.params.id },
+      data: {
+        details: {
+          ...request.details,
+          linkedFactureId: factureId
+        }
+      }
+    });
+
+    console.log('✅ Facture liée à la demande:', factureId);
+    res.json({ ok: true, request: updated });
+  } catch (e) {
+    console.error('Erreur POST retro-requests/:id/link-facture:', e.message);
+    res.status(500).json({ error: 'Link failed' });
+  }
+});
+
 // RETRO NEWS (content management)
 app.get(['/api/retro-news'], requireAuth, (req, res) => {
   res.json(state.retroNews || []);
