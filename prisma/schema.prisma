@@ -63,7 +63,6 @@ model Vehicle {
   
   // Immatriculation et identification
   immat                 String?
-  numerosFlotte         String?
   constructeur          String?
   
   // Caractéristiques techniques
@@ -147,7 +146,6 @@ model Event {
 
 model Flash {
   id        String   @id @default(cuid())
-  title     String?
   message   String?
   content   String?
   type      String?  @default("info")
@@ -169,7 +167,6 @@ model Notification {
 model RetroNews {
   id          String   @id @default(cuid())
   title       String?
-  body        String?
   content     String?
   excerpt     String?
   imageUrl    String?
