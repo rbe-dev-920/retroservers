@@ -1291,34 +1291,62 @@ app.post(['/vehicles/:parc/assurance','/api/vehicles/:parc/assurance'], requireA
 });
 
 // CONTRÔLE TECHNIQUE
-app.get(['/vehicles/:parc/ct','/api/vehicles/:parc/ct'], requireAuth, (req, res) => {
-  const parc = req.params.parc;
-  const cts = state.vehicleControleTechnique.filter(c => c.parc === parc).sort((a, b) => new Date(b.ctDate) - new Date(a.ctDate));
-  const latest = cts[0];
-  
-  if (!latest) return res.json({ parc, ctHistory: [], latestCT: null });
-  
-  res.json({ parc, ctHistory: cts, latestCT: latest });
+app.get(['/vehicles/:parc/ct','/api/vehicles/:parc/ct'], requireAuth, async (req, res) => {
+  try {
+    const parc = req.params.parc;
+    const cts = await prisma.vehicleControlTechnique.findMany({
+      where: { parc },
+      orderBy: { ctDate: 'desc' }
+    });
+    
+    const latest = cts[0] || null;
+    res.json({ parc, ctHistory: cts, latestCT: latest });
+  } catch (e) {
+    console.error('❌ Error fetching CT:', e.message);
+    res.status(500).json({ error: 'Failed to fetch contrôle technique', details: e.message });
+  }
 });
 
-app.post(['/vehicles/:parc/ct','/api/vehicles/:parc/ct'], requireAuth, (req, res) => {
-  const parc = req.params.parc;
-  const { attestationPath, ctDate, ctStatus, nextCtDate, mileage, notes } = req.body;
-  
-  const ct = {
-    id: uid(),
-    parc,
-    attestationPath,
-    ctDate: ctDate || new Date().toISOString(),
-    ctStatus: ctStatus || 'passed', // 'passed' | 'contre-visite' | 'failed'
-    nextCtDate: nextCtDate || null,
-    mileage: mileage || null,
-    notes: notes || ''
-  };
-  
-  state.vehicleControleTechnique.push(ct);
-  debouncedSave();
-  res.status(201).json(ct);
+app.post(['/vehicles/:parc/ct','/api/vehicles/:parc/ct'], requireAuth, async (req, res) => {
+  try {
+    const parc = req.params.parc;
+    const { attestationPath, ctDate, ctStatus, nextCtDate, mileage, notes } = req.body;
+    
+    // Create in Prisma
+    const ct = await prisma.vehicleControlTechnique.create({
+      data: {
+        id: uid(),
+        parc,
+        attestationPath: attestationPath || null,
+        ctDate: ctDate ? new Date(ctDate) : new Date(),
+        ctStatus: ctStatus || 'passed',
+        nextCtDate: nextCtDate ? new Date(nextCtDate) : null,
+        mileage: mileage ? parseInt(mileage) : null,
+        notes: notes || null,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }
+    });
+    
+    // Also save to state for in-memory access
+    state.vehicleControleTechnique.push({
+      id: ct.id,
+      parc: ct.parc,
+      attestationPath: ct.attestationPath,
+      ctDate: ct.ctDate.toISOString(),
+      ctStatus: ct.ctStatus,
+      nextCtDate: ct.nextCtDate?.toISOString() || null,
+      mileage: ct.mileage,
+      notes: ct.notes
+    });
+    
+    debouncedSave();
+    console.log('✅ Contrôle technique créé:', ct.id, parc);
+    res.status(201).json(ct);
+  } catch (e) {
+    console.error('❌ Error creating CT:', e.message);
+    res.status(500).json({ error: 'Failed to create contrôle technique', details: e.message });
+  }
 });
 
 // CERTIFICAT DE CESSION (une seule fois)
@@ -2832,6 +2860,24 @@ app.listen(PORT, async () => {
     console.log(`✅ Loaded ${state.members.length} members from Prisma`);
   } catch (e) {
     console.warn('⚠️ Failed to load members from Prisma:', e.message);
+  }
+
+  // Load contrôles techniques from Prisma
+  try {
+    const prismaCtData = await prisma.vehicleControlTechnique.findMany();
+    state.vehicleControleTechnique = prismaCtData.map(ct => ({
+      id: ct.id,
+      parc: ct.parc,
+      attestationPath: ct.attestationPath,
+      ctDate: ct.ctDate instanceof Date ? ct.ctDate.toISOString() : ct.ctDate,
+      ctStatus: ct.ctStatus,
+      nextCtDate: ct.nextCtDate instanceof Date ? ct.nextCtDate.toISOString() : ct.nextCtDate,
+      mileage: ct.mileage,
+      notes: ct.notes
+    }));
+    console.log(`✅ Loaded ${state.vehicleControleTechnique.length} contrôles techniques from Prisma`);
+  } catch (e) {
+    console.warn('⚠️ Failed to load contrôles techniques from Prisma:', e.message);
   }
 
   console.log('');

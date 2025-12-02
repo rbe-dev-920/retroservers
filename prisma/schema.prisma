@@ -731,6 +731,22 @@ model vehicle_service_schedule {
   @@index([vehicleId])
 }
 
+model VehicleControlTechnique {
+  id                String   @id
+  parc              String
+  attestationPath   String?
+  ctDate            DateTime
+  ctStatus          String   @default("passed")
+  nextCtDate        DateTime?
+  mileage           Int?
+  notes             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime
+
+  @@index([parc])
+  @@index([ctDate])
+}
+
 enum DocumentStatus {
   PENDING
   APPROVED
