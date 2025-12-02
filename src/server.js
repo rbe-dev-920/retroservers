@@ -2370,54 +2370,82 @@ app.delete('/api/email-templates/:id', requireAuth, (req, res) => {
 });
 
 // ===== ADMIN PROMOTION ENDPOINT =====
-// POST /api/admin/users/:userId/make-admin - Grant admin permissions to a user
+// POST /api/admin/users/:id/permissions - Set user permissions
+app.post('/api/admin/users/:id/permissions', requireAuth, (req, res) => {
+  try {
+    const { id } = req.params;
+    const { permissions } = req.body;
+    
+    // Find the member with this ID
+    const member = state.members.find(m => m.id === id);
+    
+    if (!member) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    // Update member permissions
+    member.permissions = permissions || [];
+    debouncedSave();
+    
+    console.log(`✅ Permissions updated for user ${id}`);
+    res.json({ ok: true, user: member });
+  } catch (e) {
+    console.error('❌ POST /api/admin/users/:id/permissions error:', e.message);
+    res.status(500).json({ error: 'Failed to update permissions', details: e.message });
+  }
+});
+
+// GET /api/admin/users/:id/permissions - Get user permissions
+app.get('/api/admin/users/:id/permissions', requireAuth, (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Find the member with this ID
+    const member = state.members.find(m => m.id === id);
+    
+    if (!member) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    res.json({ 
+      userId: id,
+      email: member.email,
+      permissions: member.permissions || []
+    });
+  } catch (e) {
+    console.error('❌ GET /api/admin/users/:id/permissions error:', e.message);
+    res.status(500).json({ error: 'Failed to fetch permissions', details: e.message });
+  }
+});
 app.post('/api/admin/users/:userId/make-admin', requireAuth, (req, res) => {
   const { userId } = req.params;
   
   console.log(`👤 Admin promotion request for user: ${userId}`);
   
-  // Find the site_users entry for this memberId
-  let siteUser = null;
-  if (state.siteUsers) {
-    siteUser = state.siteUsers.find(u => u.linkedMemberId === userId || u.id === userId);
+  // Find the member with this ID
+  const member = state.members.find(m => m.id === userId);
+  
+  if (!member) {
+    return res.status(404).json({ error: 'User not found' });
   }
   
-  if (!siteUser) {
-    return res.status(400).json({ error: 'User not found in site_users' });
-  }
+  // Update member role to ADMIN
+  member.role = 'ADMIN';
+  member.permissions = member.permissions || [];
   
   // Define admin resources
   const adminResources = ['members', 'vehicles', 'events', 'finance', 'transactions', 'reports', 'permissions', 'users', 'news', 'documents', 'maintenance', 'admin'];
   const adminActions = ['READ', 'CREATE', 'UPDATE', 'DELETE', 'ADMIN'];
   
-  // Create permission records for this user
-  state.userPermissions[siteUser.id] = { 
-    permissions: adminResources.map(resource => ({
-      id: uid(),
-      resource: resource,
-      actions: adminActions,
-      grantedAt: new Date().toISOString(),
-      grantedBy: 'api'
-    }))
-  };
-  
-  // Update role in siteUsers
-  siteUser.role = 'ADMIN';
+  // Add all admin permissions
+  member.permissions = adminResources.map(resource => ({
+    resource: resource,
+    actions: adminActions
+  }));
   
   debouncedSave();
-  console.log(`✅ Admin permissions granted to ${siteUser.firstName} ${siteUser.lastName}`);
-  
-  res.json({
-    success: true,
-    message: `Admin permissions granted to user ${userId}`,
-    user: {
-      id: siteUser.id,
-      linkedMemberId: siteUser.linkedMemberId,
-      firstName: siteUser.firstName,
-      lastName: siteUser.lastName,
-      role: 'ADMIN'
-    }
-  });
+  console.log(`✅ User ${userId} promoted to ADMIN`);
+  res.json({ ok: true, user: member });
 });
 
 // ===== ENDPOINTS ADMINISTRATION VÉHICULES (PERSISTE DANS PRISMA) =====
