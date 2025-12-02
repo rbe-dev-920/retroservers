@@ -222,6 +222,107 @@ const updateEventInMemory = (eventId, updatePayload = {}) => {
   return state.events[idx];
 };
 
+// VEHICLE HELPERS ---------------------------------------------------------
+const prismaVehicleFieldAllowList = new Set([
+  'marque','modele','type','etat','subtitle','description','history','isPublic',
+  'immat','energie','miseEnCirculation','longueur','placesAssises','placesDebout',
+  'ufr','moteur','boiteVitesses','nombrePortes','climatisation','girouette',
+  'normeEuro','livree','statut','preservePar','fuel','caracteristiques'
+]);
+
+const numericVehicleFields = new Set(['placesAssises','placesDebout','nombrePortes','fuel']);
+const dateVehicleFields = new Set(['miseEnCirculation']);
+const booleanVehicleFields = new Set(['isPublic']);
+
+const coerceVehicleValue = (key, value) => {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  if (numericVehicleFields.has(key)) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  if (dateVehicleFields.has(key)) {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  if (booleanVehicleFields.has(key)) {
+    if (typeof value === 'string') return value.toLowerCase() === 'true';
+    return Boolean(value);
+  }
+  if (key === 'caracteristiques' && typeof value === 'object') {
+    try {
+      return JSON.stringify(value);
+    } catch (error) {
+      console.warn('⚠️  Impossible de sérialiser caracteristiques:', error.message);
+      return null;
+    }
+  }
+  return value;
+};
+
+const buildPrismaVehicleUpdateData = (payload = {}) => {
+  if (!payload || typeof payload !== 'object') return {};
+  const data = {};
+  Object.keys(payload).forEach((key) => {
+    if (!prismaVehicleFieldAllowList.has(key)) return;
+    const coerced = coerceVehicleValue(key, payload[key]);
+    if (coerced !== undefined) data[key] = coerced;
+  });
+  return data;
+};
+
+const buildStateVehicleUpdateData = (payload = {}) => {
+  if (!payload || typeof payload !== 'object') return {};
+  const update = {};
+  Object.keys(payload).forEach((key) => {
+    let value = payload[key];
+    if (dateVehicleFields.has(key)) {
+      const date = new Date(value);
+      value = Number.isNaN(date.getTime()) ? null : date.toISOString();
+    } else if (booleanVehicleFields.has(key)) {
+      if (typeof value === 'string') value = value.toLowerCase() === 'true';
+      else value = Boolean(value);
+    } else if (numericVehicleFields.has(key)) {
+      const parsed = Number(value);
+      value = Number.isFinite(parsed) ? parsed : null;
+    } else if (key === 'caracteristiques' && typeof value === 'object') {
+      try {
+        value = JSON.stringify(value);
+      } catch (error) {
+        console.warn('⚠️  Impossible de sérialiser caracteristiques:', error.message);
+        value = null;
+      }
+    }
+    update[key] = value;
+  });
+  return update;
+};
+
+const upsertVehicleInMemory = (vehicle) => {
+  if (!vehicle) return null;
+  if (!Array.isArray(state.vehicles)) state.vehicles = [];
+  const idx = state.vehicles.findIndex(v => v.parc === vehicle.parc);
+  if (idx === -1) {
+    state.vehicles.push({ ...vehicle });
+    return state.vehicles[state.vehicles.length - 1];
+  }
+  state.vehicles[idx] = { ...state.vehicles[idx], ...vehicle };
+  return state.vehicles[idx];
+};
+
+const updateVehicleInMemory = (parc, updatePayload = {}) => {
+  if (!Array.isArray(state.vehicles)) state.vehicles = [];
+  const idx = state.vehicles.findIndex(v => v.parc === parc || String(v.id) === String(parc));
+  if (idx === -1) return null;
+  state.vehicles[idx] = {
+    ...state.vehicles[idx],
+    ...updatePayload,
+    parc: state.vehicles[idx].parc || parc,
+    updatedAt: new Date().toISOString()
+  };
+  return state.vehicles[idx];
+};
+
 // ============================================================
 // 💾 CHARGEMENT DU BACKUP AU DÉMARRAGE
 // ============================================================
@@ -819,17 +920,33 @@ app.get(['/retromail/:filename.pdf'], requireAuth, (req, res) => {
 // ⛔ FIN ENDPOINTS DÉPLACÉS
 
 app.put(['/vehicles/:parc','/api/vehicles/:parc'], requireAuth, async (req, res) => {
-  try {
-    const vehicle = await prisma.vehicle.update({
-      where: { parc: req.params.parc },
-      data: req.body
-    });
-    console.log('✅ Vehicle modifié:', vehicle.parc);
-    res.json({ vehicle });
-  } catch (e) {
-    console.error('Erreur PUT /vehicles/:parc (Prisma):', e.message);
-    res.status(500).json({ error: 'Database error' });
+  const prismaData = buildPrismaVehicleUpdateData(req.body || {});
+  const canUsePrisma = prismaAvailable && prisma && Object.keys(prismaData).length > 0;
+
+  if (canUsePrisma) {
+    try {
+      const vehicle = await prisma.vehicle.update({
+        where: { parc: req.params.parc },
+        data: prismaData
+      });
+      const synced = upsertVehicleInMemory({ parc: vehicle.parc, ...vehicle }) || vehicle;
+      debouncedSave();
+      console.log('✅ Vehicle modifié:', vehicle.parc);
+      return res.json({ vehicle: synced, source: 'prisma' });
+    } catch (e) {
+      console.error('Erreur PUT /vehicles/:parc (Prisma):', e.message);
+    }
   }
+
+  const stateUpdate = buildStateVehicleUpdateData(req.body || {});
+  const fallbackVehicle = updateVehicleInMemory(req.params.parc, stateUpdate);
+  if (fallbackVehicle) {
+    debouncedSave();
+    console.log('🧠 Vehicle modifié en mémoire:', req.params.parc);
+    return res.json({ vehicle: fallbackVehicle, source: 'memory' });
+  }
+
+  res.status(404).json({ error: 'Vehicle not found' });
 });
 
 // Usages (historique pointages) - PRISMA avec fallback
