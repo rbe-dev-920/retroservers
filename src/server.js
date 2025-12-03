@@ -3654,7 +3654,7 @@ app.post(['/api/vehicle', '/vehicle'], requireAuth, async (req, res) => {
   try {
     const item = await prisma.vehicle.create({
       data: {
-        id: require('crypto').randomBytes(16).toString('hex'),
+        id: uid(),
         ...req.body,
         createdAt: new Date(),
         updatedAt: new Date()
@@ -3726,7 +3726,7 @@ app.post(['/api/event', '/event'], requireAuth, async (req, res) => {
   try {
     const item = await prisma.event.create({
       data: {
-        id: require('crypto').randomBytes(16).toString('hex'),
+        id: uid(),
         ...req.body,
         createdAt: new Date(),
         updatedAt: new Date()
@@ -3798,7 +3798,7 @@ app.post(['/api/flash', '/flash'], requireAuth, async (req, res) => {
   try {
     const item = await prisma.flash.create({
       data: {
-        id: require('crypto').randomBytes(16).toString('hex'),
+        id: uid(),
         ...req.body,
         createdAt: new Date(),
         updatedAt: new Date()
@@ -3870,7 +3870,7 @@ app.post(['/api/retro_request', '/retro_request'], requireAuth, async (req, res)
   try {
     const item = await prisma.retro_request.create({
       data: {
-        id: require('crypto').randomBytes(16).toString('hex'),
+        id: uid(),
         ...req.body,
         createdAt: new Date(),
         updatedAt: new Date()
@@ -3942,7 +3942,7 @@ app.post(['/api/retro_request_file', '/retro_request_file'], requireAuth, async 
   try {
     const item = await prisma.retro_request_file.create({
       data: {
-        id: require('crypto').randomBytes(16).toString('hex'),
+        id: uid(),
         ...req.body,
         createdAt: new Date(),
         updatedAt: new Date()
@@ -4014,7 +4014,7 @@ app.post(['/api/site_users', '/site_users'], requireAuth, async (req, res) => {
   try {
     const item = await prisma.site_users.create({
       data: {
-        id: require('crypto').randomBytes(16).toString('hex'),
+        id: uid(),
         ...req.body,
         createdAt: new Date(),
         updatedAt: new Date()
@@ -4086,7 +4086,7 @@ app.post(['/api/document', '/document'], requireAuth, async (req, res) => {
   try {
     const item = await prisma.document.create({
       data: {
-        id: require('crypto').randomBytes(16).toString('hex'),
+        id: uid(),
         ...req.body,
         createdAt: new Date(),
         updatedAt: new Date()
@@ -4158,7 +4158,7 @@ app.post(['/api/vehicle_maintenance', '/vehicle_maintenance'], requireAuth, asyn
   try {
     const item = await prisma.vehicle_maintenance.create({
       data: {
-        id: require('crypto').randomBytes(16).toString('hex'),
+        id: uid(),
         ...req.body,
         createdAt: new Date(),
         updatedAt: new Date()
@@ -4230,7 +4230,7 @@ app.post(['/api/vehicle_service_schedule', '/vehicle_service_schedule'], require
   try {
     const item = await prisma.vehicle_service_schedule.create({
       data: {
-        id: require('crypto').randomBytes(16).toString('hex'),
+        id: uid(),
         ...req.body,
         createdAt: new Date(),
         updatedAt: new Date()
@@ -4302,7 +4302,7 @@ app.post(['/api/usage', '/usage'], requireAuth, async (req, res) => {
   try {
     const item = await prisma.usage.create({
       data: {
-        id: require('crypto').randomBytes(16).toString('hex'),
+        id: uid(),
         ...req.body,
         createdAt: new Date(),
         updatedAt: new Date()
@@ -4374,7 +4374,7 @@ app.post(['/api/vehicle-control-technique', '/vehicle-control-technique'], requi
   try {
     const item = await prisma.vehicleControlTechnique.create({
       data: {
-        id: require('crypto').randomBytes(16).toString('hex'),
+        id: uid(),
         ...req.body,
         createdAt: new Date(),
         updatedAt: new Date()
@@ -4446,7 +4446,7 @@ app.post(['/api/vehicle-cession-certificate', '/vehicle-cession-certificate'], r
   try {
     const item = await prisma.vehicleCessionCertificate.create({
       data: {
-        id: require('crypto').randomBytes(16).toString('hex'),
+        id: uid(),
         ...req.body,
         createdAt: new Date(),
         updatedAt: new Date()
@@ -4518,7 +4518,7 @@ app.post(['/api/vehicle-grayscale', '/vehicle-grayscale'], requireAuth, async (r
   try {
     const item = await prisma.vehicleGrayscale.create({
       data: {
-        id: require('crypto').randomBytes(16).toString('hex'),
+        id: uid(),
         ...req.body,
         createdAt: new Date(),
         updatedAt: new Date()
@@ -4590,7 +4590,7 @@ app.post(['/api/vehicle-insurance', '/vehicle-insurance'], requireAuth, async (r
   try {
     const item = await prisma.vehicleInsurance.create({
       data: {
-        id: require('crypto').randomBytes(16).toString('hex'),
+        id: uid(),
         ...req.body,
         createdAt: new Date(),
         updatedAt: new Date()
@@ -4662,7 +4662,7 @@ app.post(['/api/vehicle-inspection', '/vehicle-inspection'], requireAuth, async 
   try {
     const item = await prisma.vehicleInspection.create({
       data: {
-        id: require('crypto').randomBytes(16).toString('hex'),
+        id: uid(),
         ...req.body,
         createdAt: new Date(),
         updatedAt: new Date()
