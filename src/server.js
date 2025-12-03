@@ -1666,13 +1666,40 @@ app.delete(['/api/retro-requests/:id'], requireAuth, async (req, res) => {
   }
 });
 
-app.post(['/api/retro-requests/:id/status'], requireAuth, (req, res) => {
-  const idx = state.retroNews.findIndex(r => r.id === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: 'Request not found' });
-  
-  state.retroNews[idx].status = req.body.status;
-  debouncedSave();
-  res.json({ ok: true, news: state.retroNews[idx] });
+app.post(['/api/retro-requests/:id/status'], requireAuth, async (req, res) => {
+  try {
+    // Get member by email
+    const member = await prisma.members.findUnique({ where: { email: req.user.email } });
+    if (!member) {
+      return res.status(404).json({ error: 'Member not found' });
+    }
+
+    // Find the request
+    const request = await prisma.retro_request.findUnique({ where: { id: req.params.id } });
+    if (!request) {
+      return res.status(404).json({ error: 'Request not found' });
+    }
+
+    // Check authorization - only owner or admin
+    const isAdmin = member.role === 'ADMIN';
+    if (request.userId !== member.id && !isAdmin) {
+      return res.status(403).json({ error: 'Not authorized to update this request' });
+    }
+
+    // Update status
+    const updatedRequest = await prisma.retro_request.update({
+      where: { id: req.params.id },
+      data: {
+        status: req.body.status,
+        updatedAt: new Date()
+      }
+    });
+
+    res.json({ ok: true, request: updatedRequest });
+  } catch (error) {
+    console.error('Error updating status:', error);
+    res.status(500).json({ error: 'Failed to update status' });
+  }
 });
 
 // Upload file to retro request
