@@ -1113,7 +1113,7 @@ app.put(['/vehicles/:parc','/api/vehicles/:parc'], requireAuth, async (req, res)
 // Usages (historique pointages) - PRISMA avec fallback
 app.get(['/vehicles/:parc/usages','/api/vehicles/:parc/usages'], requireAuth, async (req, res) => {
   try {
-    const usages = await prisma.usage.findMany({
+    const usages = await prisma.Usage.findMany({
       where: { parc: req.params.parc },
       orderBy: { startedAt: 'desc' }
     });
@@ -1126,7 +1126,7 @@ app.get(['/vehicles/:parc/usages','/api/vehicles/:parc/usages'], requireAuth, as
 
 app.post(['/vehicles/:parc/usages','/api/vehicles/:parc/usages'], requireAuth, async (req, res) => {
   try {
-    const usage = await prisma.usage.create({
+    const usage = await prisma.Usage.create({
       data: {
         parc: req.params.parc,
         startedAt: new Date(),
@@ -1144,7 +1144,7 @@ app.post(['/vehicles/:parc/usages','/api/vehicles/:parc/usages'], requireAuth, a
 
 app.post(['/vehicles/:parc/usages/:id/end','/api/vehicles/:parc/usages/:id/end'], requireAuth, async (req, res) => {
   try {
-    const usage = await prisma.usage.update({
+    const usage = await prisma.Usage.update({
       where: { id: parseInt(req.params.id) },
       data: { endedAt: new Date() }
     });
@@ -3652,11 +3652,23 @@ app.get(['/api/vehicle/:id', '/vehicle/:id'], requireAuth, async (req, res) => {
 // POST - Create new vehicle
 app.post(['/api/vehicle', '/vehicle'], requireAuth, async (req, res) => {
   try {
+    const { parc, type, modele, etat, marque, ...rest } = req.body;
+    
+    if (!parc || !type || !modele || !etat) {
+      return res.status(400).json({ 
+        error: 'Missing required fields', 
+        required: ['parc', 'type', 'modele', 'etat']
+      });
+    }
+    
     const item = await prisma.vehicle.create({
       data: {
-        id: uid(),
-        ...req.body,
-        createdAt: new Date(),
+        parc,
+        type,
+        modele,
+        etat,
+        marque: marque || null,
+        ...rest,
         updatedAt: new Date()
       }
     });
@@ -3724,11 +3736,21 @@ app.get(['/api/event/:id', '/event/:id'], requireAuth, async (req, res) => {
 // POST - Create new event
 app.post(['/api/event', '/event'], requireAuth, async (req, res) => {
   try {
+    const { title, date, ...rest } = req.body;
+    
+    if (!title || !date) {
+      return res.status(400).json({ 
+        error: 'Missing required fields', 
+        required: ['title', 'date']
+      });
+    }
+    
     const item = await prisma.event.create({
       data: {
         id: uid(),
-        ...req.body,
-        createdAt: new Date(),
+        title,
+        date: new Date(date),
+        ...rest,
         updatedAt: new Date()
       }
     });
@@ -3796,11 +3818,20 @@ app.get(['/api/flash/:id', '/flash/:id'], requireAuth, async (req, res) => {
 // POST - Create new flash
 app.post(['/api/flash', '/flash'], requireAuth, async (req, res) => {
   try {
+    const { content, ...rest } = req.body;
+    
+    if (!content) {
+      return res.status(400).json({ 
+        error: 'Missing required fields', 
+        required: ['content']
+      });
+    }
+    
     const item = await prisma.flash.create({
       data: {
         id: uid(),
-        ...req.body,
-        createdAt: new Date(),
+        content,
+        ...rest,
         updatedAt: new Date()
       }
     });
@@ -4275,7 +4306,7 @@ app.delete(['/api/vehicle_service_schedule/:id', '/vehicle_service_schedule/:id'
 // GET - List all usage
 app.get(['/api/usage', '/usage'], requireAuth, async (req, res) => {
   try {
-    const items = await prisma.usage.findMany();
+    const items = await prisma.Usage.findMany();
     res.json(items);
   } catch (e) {
     console.error('❌ Error getting usage:', e.message);
@@ -4286,7 +4317,7 @@ app.get(['/api/usage', '/usage'], requireAuth, async (req, res) => {
 // GET - Get single usage
 app.get(['/api/usage/:id', '/usage/:id'], requireAuth, async (req, res) => {
   try {
-    const item = await prisma.usage.findUnique({
+    const item = await prisma.Usage.findUnique({
       where: { id: req.params.id }
     });
     if (!item) return res.status(404).json({ error: 'usage not found' });
@@ -4300,11 +4331,20 @@ app.get(['/api/usage/:id', '/usage/:id'], requireAuth, async (req, res) => {
 // POST - Create new usage
 app.post(['/api/usage', '/usage'], requireAuth, async (req, res) => {
   try {
-    const item = await prisma.usage.create({
+    const { parc, startedAt, ...rest } = req.body;
+    
+    if (!parc || !startedAt) {
+      return res.status(400).json({ 
+        error: 'Missing required fields', 
+        required: ['parc', 'startedAt']
+      });
+    }
+    
+    const item = await prisma.Usage.create({
       data: {
-        id: uid(),
-        ...req.body,
-        createdAt: new Date(),
+        parc,
+        startedAt: new Date(startedAt),
+        ...rest,
         updatedAt: new Date()
       }
     });
@@ -4318,7 +4358,7 @@ app.post(['/api/usage', '/usage'], requireAuth, async (req, res) => {
 // PUT - Update usage
 app.put(['/api/usage/:id', '/usage/:id'], requireAuth, async (req, res) => {
   try {
-    const item = await prisma.usage.update({
+    const item = await prisma.Usage.update({
       where: { id: req.params.id },
       data: { ...req.body, updatedAt: new Date() }
     });
@@ -4332,7 +4372,7 @@ app.put(['/api/usage/:id', '/usage/:id'], requireAuth, async (req, res) => {
 // DELETE - Remove usage
 app.delete(['/api/usage/:id', '/usage/:id'], requireAuth, async (req, res) => {
   try {
-    const deleted = await prisma.usage.delete({
+    const deleted = await prisma.Usage.delete({
       where: { id: req.params.id }
     });
     res.json({ ok: true, deleted });

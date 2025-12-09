@@ -5,8 +5,9 @@
  * Teste la persistence des données pour tous les modèles
  */
 
-const BASE_URL = 'http://localhost:3001';
-const TOKEN = 'stub.' + Buffer.from('test@retrobus.fr').toString('base64');
+const BASE_URL = process.env.API_URL || 'https://attractive-kindness-rbe-serveurs.up.railway.app';
+const TOKEN_RAW = 'stub.' + Buffer.from('test@retrobus.fr').toString('base64');
+const AUTH_HEADER = `Bearer ${TOKEN_RAW}`;
 
 // Modèles à tester
 const MODELS = [
@@ -33,7 +34,7 @@ async function testModel(model) {
   try {
     // Test GET (Read)
     const getRes = await fetch(`${BASE_URL}/api/${model}`, {
-      headers: { 'Authorization': TOKEN }
+      headers: { 'Authorization': AUTH_HEADER }
     });
     
     if (!getRes.ok) {
@@ -52,7 +53,7 @@ async function testModel(model) {
     const postRes = await fetch(`${BASE_URL}/api/${model}`, {
       method: 'POST',
       headers: {
-        'Authorization': TOKEN,
+        'Authorization': AUTH_HEADER,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(testData)
@@ -72,7 +73,7 @@ async function testModel(model) {
       const putRes = await fetch(`${BASE_URL}/api/${model}/${created.id}`, {
         method: 'PUT',
         headers: {
-          'Authorization': TOKEN,
+          'Authorization': AUTH_HEADER,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ ...testData, status: 'updated' })
@@ -87,7 +88,7 @@ async function testModel(model) {
       // Test DELETE (Delete)
       const deleteRes = await fetch(`${BASE_URL}/api/${model}/${created.id}`, {
         method: 'DELETE',
-        headers: { 'Authorization': TOKEN }
+        headers: { 'Authorization': AUTH_HEADER }
       });
       
       if (deleteRes.ok) {
