@@ -115,7 +115,8 @@ async function testDetailedCreate() {
   try {
     const testData = {
       parc: 'TEST-USAGE',
-      conducteur: 'Test Conductor'
+      conducteur: 'Test Conductor',
+      startedAt: new Date().toISOString()
     };
 
     const response = await fetch(`${BASE_URL}/api/usage`, {
