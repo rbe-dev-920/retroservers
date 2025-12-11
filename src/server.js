@@ -99,6 +99,7 @@ const state = {
   vehicleCertificatCession: [],
   vehicleEchancier: [],
   scheduled: [],
+  simulations: [],
   bankBalance: 0,
   categories: [
     { id: 'adhesions', name: 'Adhésions', type: 'recette' },
@@ -3025,6 +3026,181 @@ app.put('/api/finance/scheduled-operations/:id', requireAuth, (req, res) => {
 app.delete('/api/finance/scheduled-operations/:id', requireAuth, (req, res) => {
   state.scheduled = state.scheduled.filter(o => o.id !== req.params.id);
   res.json({ ok: true });
+});
+
+// ============================================================
+// SIMULATIONS ENDPOINT - Financial scenario simulations
+// ============================================================
+app.get('/api/finance/simulations', requireAuth, (req, res) => {
+  res.json(state.simulations || []);
+});
+
+app.post('/api/finance/simulations', requireAuth, (req, res) => {
+  const scenario = {
+    id: uid(),
+    ...req.body,
+    createdAt: new Date().toISOString(),
+    incomeItems: req.body.incomeItems || [],
+    expenseItems: req.body.expenseItems || []
+  };
+  state.simulations.push(scenario);
+  debouncedSave();
+  res.status(201).json(scenario);
+});
+
+app.get('/api/finance/simulations/:id', requireAuth, (req, res) => {
+  const scenario = state.simulations.find(s => s.id === req.params.id);
+  if (!scenario) {
+    return res.status(404).json({ error: 'Scenario not found' });
+  }
+  res.json(scenario);
+});
+
+app.put('/api/finance/simulations/:id', requireAuth, (req, res) => {
+  const idx = state.simulations.findIndex(s => s.id === req.params.id);
+  if (idx === -1) {
+    return res.status(404).json({ error: 'Scenario not found' });
+  }
+  state.simulations[idx] = {
+    ...state.simulations[idx],
+    ...req.body,
+    updatedAt: new Date().toISOString()
+  };
+  debouncedSave();
+  res.json(state.simulations[idx]);
+});
+
+app.delete('/api/finance/simulations/:id', requireAuth, (req, res) => {
+  state.simulations = state.simulations.filter(s => s.id !== req.params.id);
+  debouncedSave();
+  res.json({ ok: true });
+});
+
+// Add income item to simulation
+app.post('/api/finance/simulations/:id/income', requireAuth, (req, res) => {
+  const scenario = state.simulations.find(s => s.id === req.params.id);
+  if (!scenario) {
+    return res.status(404).json({ error: 'Scenario not found' });
+  }
+  const item = {
+    id: uid(),
+    ...req.body,
+    createdAt: new Date().toISOString()
+  };
+  if (!scenario.incomeItems) scenario.incomeItems = [];
+  scenario.incomeItems.push(item);
+  debouncedSave();
+  res.status(201).json(item);
+});
+
+// Remove income item from simulation
+app.delete('/api/finance/simulations/:id/income/:itemId', requireAuth, (req, res) => {
+  const scenario = state.simulations.find(s => s.id === req.params.id);
+  if (!scenario) {
+    return res.status(404).json({ error: 'Scenario not found' });
+  }
+  if (!scenario.incomeItems) scenario.incomeItems = [];
+  scenario.incomeItems = scenario.incomeItems.filter(i => i.id !== req.params.itemId);
+  debouncedSave();
+  res.json({ ok: true });
+});
+
+// Add expense item to simulation
+app.post('/api/finance/simulations/:id/expense', requireAuth, (req, res) => {
+  const scenario = state.simulations.find(s => s.id === req.params.id);
+  if (!scenario) {
+    return res.status(404).json({ error: 'Scenario not found' });
+  }
+  const item = {
+    id: uid(),
+    ...req.body,
+    createdAt: new Date().toISOString()
+  };
+  if (!scenario.expenseItems) scenario.expenseItems = [];
+  scenario.expenseItems.push(item);
+  debouncedSave();
+  res.status(201).json(item);
+});
+
+// Remove expense item from simulation
+app.delete('/api/finance/simulations/:id/expense/:itemId', requireAuth, (req, res) => {
+  const scenario = state.simulations.find(s => s.id === req.params.id);
+  if (!scenario) {
+    return res.status(404).json({ error: 'Scenario not found' });
+  }
+  if (!scenario.expenseItems) scenario.expenseItems = [];
+  scenario.expenseItems = scenario.expenseItems.filter(e => e.id !== req.params.itemId);
+  debouncedSave();
+  res.json({ ok: true });
+});
+
+// Run simulation (calculate projection)
+app.post('/api/finance/simulations/:id/run', requireAuth, (req, res) => {
+  const scenario = state.simulations.find(s => s.id === req.params.id);
+  if (!scenario) {
+    return res.status(404).json({ error: 'Scenario not found' });
+  }
+
+  const { startingBalance = 0, projectionMonths = 12 } = req.body;
+  const incomeItems = scenario.incomeItems || [];
+  const expenseItems = scenario.expenseItems || [];
+
+  // Helper: get frequency multiplier (times per year)
+  const getFrequencyMultiplier = (freq) => {
+    const freqMap = {
+      'MONTHLY': 12,
+      'QUARTERLY': 4,
+      'SEMI_ANNUAL': 2,
+      'YEARLY': 1,
+      'ONE_SHOT': 0
+    };
+    return freqMap[freq] || 1;
+  };
+
+  // Calculate monthly amounts
+  const monthlyIncome = incomeItems.reduce((sum, item) => {
+    const multiplier = getFrequencyMultiplier(item.frequency);
+    return sum + (parseFloat(item.amount) || 0) / (multiplier > 0 ? multiplier : 12);
+  }, 0);
+
+  const monthlyExpense = expenseItems.reduce((sum, item) => {
+    const multiplier = getFrequencyMultiplier(item.frequency);
+    return sum + (parseFloat(item.amount) || 0) / (multiplier > 0 ? multiplier : 12);
+  }, 0);
+
+  const monthlyNet = monthlyIncome - monthlyExpense;
+
+  // Generate projection
+  const projection = [];
+  let currentBalance = startingBalance;
+  for (let month = 1; month <= projectionMonths; month++) {
+    currentBalance += monthlyNet;
+    projection.push({
+      month,
+      startBalance: month === 1 ? startingBalance : projection[month - 2]?.endBalance || startingBalance,
+      income: monthlyIncome,
+      expenses: monthlyExpense,
+      net: monthlyNet,
+      endBalance: currentBalance
+    });
+  }
+
+  const results = {
+    scenarioId: scenario.id,
+    projectionMonths,
+    startingBalance,
+    finalBalance: currentBalance,
+    monthlyNet,
+    totalChange: currentBalance - startingBalance,
+    projection,
+    summary: {
+      isPositive: monthlyNet >= 0,
+      breakEvenMonth: monthlyNet === 0 ? 1 : monthlyNet < 0 ? Math.ceil(-startingBalance / monthlyNet) : null,
+      projectionMonths
+    }
+  };
+
+  res.json(results);
 });
 
 // /api/finance/documents -> returns all documents (finance perspective)
