@@ -1171,9 +1171,16 @@ app.get(['/vehicles/:parc/maintenance','/api/vehicles/:parc/maintenance'], requi
 
 app.post(['/vehicles/:parc/maintenance','/api/vehicles/:parc/maintenance'], requireAuth, async (req, res) => {
   try {
+    console.log('📝 POST /vehicles/:parc/maintenance - Body:', JSON.stringify(req.body, null, 2));
+    
     // Get vehicle by parc code
     const vehicle = await prisma.vehicle.findUnique({ where: { parc: req.params.parc } });
-    if (!vehicle) return res.status(404).json({ error: 'Vehicle not found' });
+    if (!vehicle) {
+      console.error('❌ Vehicle not found for parc:', req.params.parc);
+      return res.status(404).json({ error: 'Vehicle not found' });
+    }
+    
+    console.log('✅ Vehicle found:', vehicle.id, vehicle.parc);
     
     const item = await prisma.vehicle_maintenance.create({
       data: {
@@ -1183,14 +1190,16 @@ app.post(['/vehicles/:parc/maintenance','/api/vehicles/:parc/maintenance'], requ
         description: req.body?.description || '',
         cost: req.body?.cost ? parseFloat(req.body.cost) : 0,
         status: req.body?.status || 'completed',
-        date: req.body?.date ? new Date(req.body.date) : new Date()
+        date: req.body?.date ? new Date(req.body.date) : new Date(),
+        updatedAt: new Date()
       }
     });
     console.log('✅ Maintenance créée:', item.id);
     res.status(201).json(item);
   } catch (e) {
-    console.error('Erreur POST maintenance (Prisma):', e.message);
-    res.status(500).json({ error: 'Database error' });
+    console.error('❌ Erreur POST maintenance (Prisma):', e.message);
+    console.error('Stack:', e.stack);
+    res.status(500).json({ error: 'Database error', details: e.message });
   }
 });
 
