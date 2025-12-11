@@ -3435,6 +3435,115 @@ app.post('/api/admin/users/:userId/make-admin', requireAuth, async (req, res) =>
   }
 });
 
+// POST /api/admin/users/:userId/role - Change user role
+app.post('/api/admin/users/:userId/role', requireAuth, async (req, res) => {
+  const { userId } = req.params;
+  const { role } = req.body;
+  
+  if (!role) {
+    return res.status(400).json({ error: 'Role is required' });
+  }
+  
+  console.log(`👤 Role change request for user: ${userId} -> ${role}`);
+  
+  try {
+    // Find the member in Prisma
+    const member = await prisma.members.findUnique({
+      where: { id: userId }
+    });
+    
+    if (!member) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    // Update in Prisma
+    const updatedMember = await prisma.members.update({
+      where: { id: userId },
+      data: {
+        role: role
+      }
+    });
+    
+    // Also update in state.members for in-memory access
+    const stateUser = state.members.find(m => m.id === userId);
+    if (stateUser) {
+      stateUser.role = role;
+    }
+    
+    debouncedSave();
+    console.log(`✅ User ${userId} role changed to ${role}`);
+    res.json({ ok: true, user: updatedMember });
+  } catch (e) {
+    console.error('❌ Change role error:', e.message);
+    res.status(500).json({ error: 'Failed to change role', details: e.message });
+  }
+});
+
+// GET /api/admin/members/search/:identifier - Find member by username, email, or any identifier
+app.get('/api/admin/members/search/:identifier', requireAuth, async (req, res) => {
+  const { identifier } = req.params;
+  
+  if (!identifier) {
+    return res.status(400).json({ error: 'Identifier is required' });
+  }
+  
+  try {
+    // Search in both Prisma and state
+    const prismaUser = await prisma.members.findFirst({
+      where: {
+        OR: [
+          { username: identifier },
+          { username: { contains: identifier } },
+          { email: { contains: identifier } },
+          { firstName: { contains: identifier } },
+          { lastName: { contains: identifier } }
+        ]
+      }
+    }).catch(() => null);
+    
+    if (prismaUser) {
+      return res.json({
+        found: true,
+        user: {
+          id: prismaUser.id,
+          username: prismaUser.username,
+          email: prismaUser.email,
+          firstName: prismaUser.firstName,
+          lastName: prismaUser.lastName,
+          role: prismaUser.role
+        }
+      });
+    }
+    
+    // Search in state.members
+    const stateUser = state.members.find(m => 
+      m.username === identifier || 
+      m.email?.includes(identifier) ||
+      m.firstName?.includes(identifier) ||
+      m.lastName?.includes(identifier)
+    );
+    
+    if (stateUser) {
+      return res.json({
+        found: true,
+        user: {
+          id: stateUser.id,
+          username: stateUser.username,
+          email: stateUser.email,
+          firstName: stateUser.firstName,
+          lastName: stateUser.lastName,
+          role: stateUser.role
+        }
+      });
+    }
+    
+    res.status(404).json({ error: 'User not found', identifier });
+  } catch (e) {
+    console.error('❌ Search member error:', e.message);
+    res.status(500).json({ error: 'Failed to search user', details: e.message });
+  }
+});
+
 // ===== ENDPOINTS ADMINISTRATION VÉHICULES (PERSISTE DANS PRISMA) =====
 
 // Cartes Grises - GET
