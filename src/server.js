@@ -3017,15 +3017,18 @@ app.get('/api/finance/scheduled-operations', requireAuth, (req, res) => {
 app.post('/api/finance/scheduled-operations', requireAuth, (req, res) => {
   const op = { id: uid(), ...req.body };
   state.scheduled.push(op);
+  debouncedSave();
   res.status(201).json(op);
 });
 app.put('/api/finance/scheduled-operations/:id', requireAuth, (req, res) => {
   state.scheduled = state.scheduled.map(o => o.id === req.params.id ? { ...o, ...req.body } : o);
   const op = state.scheduled.find(o => o.id === req.params.id);
+  debouncedSave();
   res.json(op);
 });
 app.delete('/api/finance/scheduled-operations/:id', requireAuth, (req, res) => {
   state.scheduled = state.scheduled.filter(o => o.id !== req.params.id);
+  debouncedSave();
   res.json({ ok: true });
 });
 
